@@ -89,7 +89,7 @@ classes_comp = {
 
 
 # dict with pre-defined videos and their corresponding csv and json
-inputpath = 'data/cracks/videocodage/'
+inputpath = 'data/videocodage/'
 comp_videos = {
     'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_DEGRADATION_IA_20220513_075518_PC-GAETAN_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
     'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'releve_lot_DEGRADATION_IA_20220513_080725_PC-GAETAN_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
