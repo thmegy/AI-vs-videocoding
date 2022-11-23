@@ -1,0 +1,75 @@
+{
+
+    // dict to link classes from videocoding and AI to classes used for comparison
+    classes_vid : {
+	'Affaissement de rive G significatif' : '',
+	'Affaissement de rive G grave' : '',
+	
+	'Affaissement hors rive G significatif' : '',
+	'Affaissement hors rive G grave' : '',
+	
+	'Ornierage G significatif' : '',
+	'Ornierage G grave' : '',
+	
+	'Arrachement G significatif' : 'Arrachement_pelade',
+	'Arrachement G grave' : 'Arrachement_pelade',
+	
+	'Faiencage G significatif non BDR' : 'Faiencage',
+	'Faiencage G grave non BDR' : 'Faiencage',
+	'Faiencage G specifique BDR' : 'Faiencage',
+	
+	'Fissure longitudinale BDR G reparee' : 'Pontage',
+	'Fissure longitudinale BDR G significative' : 'Longitudinale',
+	'Fissure longitudinale BDR G grave' : 'Longitudinale',
+	
+	'Fissure longitudinale HBDR G reparee' : 'Pontage',
+	'Fissure longitudinale HBDR G significative' : 'Longitudinale',
+	'Fissure longitudinale HBDR G grave' : 'Longitudinale',
+	
+	'Fissure transversale G reparee' : 'Pontage',
+	'Fissure transversale G significative' : 'Transversale',
+	'Fissure transversale G grave' : 'Transversale',
+	
+	'Nid de poule G significatif' : 'Nid_de_poule',
+	'Nid de poule G grave' : 'Nid_de_poule',
+	
+	'Ressuage - Glacage G localise' : '',
+	'Ressuage - Glacage G generalise' : '',
+	
+	'Reparation en BB sur decoupe G Petite largeur' : 'Remblaiement_de_tranchees',
+	'Reparation en BB sur decoupe G Pleine largeur' : 'Remblaiement_de_tranchees',
+	
+	'Autre reparation G Petite largeur' : 'Autre_reparation',
+	'Autre reparation G Pleine largeur' : 'Autre_reparation'
+    }
+    
+    classes_AI : {
+	'Arrachement_pelade' : 'Arrachement_pelade',
+	'Faiencage' : 'Faiencage',
+	'Nid_de_poule' : 'Nid_de_poule',
+	'Transversale' : 'Transversale',
+	'Longitudinale' : 'Longitudinale',
+	'Pontage_de_fissures' : 'Pontage',
+	'Remblaiement_de_tranchees' : 'Remblaiement_de_tranchees',
+	'Raccord_de_chaussee' : '',
+	'Comblage_de_trou_ou_Projection_d_enrobe' : 'Autre_reparation',
+	'Bouche_a_clef' : '',
+	'Grille_avaloir' : '',
+	'Regard_tampon' : ''
+    }
+    
+    
+    // classes used for comparison
+    classes_comp : {
+	'Arrachement_pelade' : 0,
+	'Faiencage' : 1,
+	'Nid_de_poule' : 2,
+	'Transversale' : 3,
+	'Longitudinale' : 4,
+	'Remblaiement_de_tranchees' : 5,
+	'Pontage' : 6,
+	'Autre_reparation' : 7,
+    }
+
+
+}

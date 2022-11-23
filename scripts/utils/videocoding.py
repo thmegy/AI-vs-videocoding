@@ -4,6 +4,9 @@ import csv
 import datetime
 import json
 from scipy.interpolate import interp1d
+import cv2 as cv
+import os
+import glob
 
 
 def strip_accents(s):
@@ -183,3 +186,208 @@ def get_length_timestamp_map(geoptis_csvpath):
     distance_for_timestamp = interp1d(traj_times, traveled_distances)
 
     return traj_times[0], distance_for_timestamp
+
+
+
+
+def extract_lengths(jsonpath, videopath, geoptis_csvpath,
+                    classes_vid, classes_AI, classes_comp,
+                    ai_type, ai_config, ai_checkpoint, process_every_nth_meter, filter_road=False):
+    '''
+    Extract a frame of the video every n meter.
+    Run inference on extracted images with pretrained model.
+    Return length from start of mission for videocding and predictions.
+    '''
+    classes, degradations, timestamps = parse_videocoding(jsonpath)
+
+    traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
+    classname_to_deg_index = {name: i for i, name in enumerate(classes)}
+    deg_index_to_classname = {i: name for name, i in classname_to_deg_index.items()}
+
+    if degradations.shape[0] == 0:
+        return 0, 0
+
+    cam = cv.VideoCapture(videopath)
+    framerate = cam.get(cv.CAP_PROP_FPS)
+
+    # length list for each AI class
+    length_AI = [[] for _ in range(len(classes_comp))]
+    length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
+    length_video = [[] for _ in range(len(classes_comp))]
+
+    # loop over videocoding annotations --> extract lengths
+    for i_timestamp, cur_timestamps in enumerate(timestamps):
+        try:
+            start, end = distance_for_timestamp(cur_timestamps)
+        except:
+            continue
+        
+        # single-frame
+        if start == end:
+            degradation_indexes = np.nonzero(degradations[i_timestamp])
+            if len(degradation_indexes) != 1 and len(degradation_indexes[0]) != 1:
+                print("Several degradations in one timestamp")
+                exit(0)
+            degradation_index = degradation_indexes[0][0]
+            degradation_name = deg_index_to_classname[degradation_index]
+            degradation_name = strip_accents(degradation_name)
+            if classes_vid[degradation_name] != '':
+                idx = classes_comp[classes_vid[degradation_name]]
+                length_video[idx].append(start)
+
+        # continuous degradations
+        if start != end:
+            dist_array = np.arange(start, end, process_every_nth_meter) # discretise continuous degradations
+            
+            degradation_indexes = np.nonzero(degradations[i_timestamp])
+            if len(degradation_indexes) != 1 and len(degradation_indexes[0]) != 1:
+                print("Several degradations in one timestamp")
+                exit(0)
+            degradation_index = degradation_indexes[0][0]
+            degradation_name = deg_index_to_classname[degradation_index]
+            degradation_name = strip_accents(degradation_name)
+            if classes_vid[degradation_name] != '':
+                idx = classes_comp[classes_vid[degradation_name]]
+                for d in dist_array:
+                    length_video[idx].append(d)
+
+    vid_name = videopath.split('/')[-1].replace(".mp4","")
+    extract_path = f'prepare_annotations/processed_videos/{vid_name}/{process_every_nth_meter}'
+    
+    if not os.path.isdir(extract_path):
+        os.makedirs(extract_path)
+        # loop over video
+        t = traj_times_0
+        d_init = 0
+        while True:
+            ret, frame = cam.read()
+            if not ret:
+                break
+        
+            t += 1 / framerate
+            try:
+                d = distance_for_timestamp(t)
+            except:
+                continue
+        
+            if (d-d_init) < process_every_nth_meter:
+                continue
+
+            d_init = d
+
+            # save frame
+            cv.imwrite(f'{extract_path}/{d}.png', frame)
+
+
+    extracted_frames = glob.glob(f'{extract_path}/*.png')
+
+    # road segmentation
+    if filter_road:
+        extract_path += '_road_filter'
+        if not os.path.isdir(extract_path):
+            os.makedirs(extract_path)
+            
+            from mmseg.apis import inference_segmentor, init_segmentor
+            road_filter = init_segmentor(
+                '/home/theo/workdir/mmseg/mmsegmentation/configs/segformer/segformer_mit-b2_8x1_1024x1024_160k_cityscapes.py',
+                '/home/theo/workdir/mmseg/checkpoints/segformer_mit-b2_8x1_1024x1024_160k_cityscapes_20211207_134205-6096669a.pth',
+                device=f'cuda:1'
+            )
+
+            for fname in extracted_frames:
+                frame = cv.imread(fname)
+
+                frame_seg = inference_segmentor(road_filter, frame)[0]
+                mask_road = frame_seg[:,:,np.newaxis] == 0 # road pixels
+                frame = np.where(mask_road, frame, 0)
+
+                # save frame
+                im_name = fname.split('/')[-1]
+                cv.imwrite(f'{extract_path}/{im_name}', frame)
+
+        extracted_frames = glob.glob(f'{extract_path}/*.png')
+
+                
+#    ann_path = f'{extract_path}/det_inference_thr_03/'
+#    os.makedirs(ann_path, exist_ok=True)
+
+    # load model
+    if ai_type == 'cls':
+        import mmcls.apis
+        model = mmcls.apis.init_model(
+            ai_config,
+            ai_checkpoint,
+            device='cuda:0',
+        )
+    elif ai_type == 'det':
+        import mmdet.apis
+        model = mmdet.apis.init_detector(
+            ai_config,
+            ai_checkpoint,
+            device='cuda:0',
+        )
+    elif ai_type == 'seg':
+        import mmseg.apis
+        model = mmseg.apis.init_segmentor(
+            ai_config,
+            ai_checkpoint,
+            device='cuda:0',
+        )
+
+    # run inference on extracted frames
+    for fname in extracted_frames:
+        d = float(fname.split('/')[-1].replace('.png', ''))
+        frame = cv.imread(fname)
+        
+        if ai_type == 'cls':
+            res = mmcls.apis.inference_model(model, frame, is_multi_label=True, threshold=0.01)
+            for pc, ps in zip(res['pred_class'], res['pred_score']):
+                if classes_AI[pc] != '':
+                    idx = classes_comp[classes_AI[pc]]
+                    length_AI[idx].append(d)
+                    length_AI_score[idx].append(ps)
+
+        elif ai_type == 'det':
+            ann = []
+            
+            res = mmdet.apis.inference_detector(model, frame)
+            image_width = frame.shape[1]
+            image_height = frame.shape[0]
+            for ic, c in enumerate(res): # loop on classes
+                if (c[:,4] > 0.01).sum() > 0:
+
+                    degradation_name = list(classes_AI.items())[ic][1]
+                    if degradation_name != '':
+                        idx = classes_comp[degradation_name]
+            
+                        length_AI[idx].append(d)
+                        length_AI_score[idx].append(c[:,4].max()) # take highest score if several instances of same class
+
+#                for ip, p in enumerate(c): # loop on bboxes
+#                    x1, y1, x2, y2 = p[:4]
+#                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+#                    if p[4] > 0.3:
+#                        ann.append(f'{ic} {(x1+x2)/2/image_width} {(y1+y2)/2/image_height} {(x2-x1)/image_width} {(y2-y1)/image_height}')
+#                        
+#            ann_name = fname.replace('.png', '.txt').replace(extract_path, ann_path)
+#            with open(ann_name, 'w') as f:
+#                for a in ann:
+#                    f.write(f'{a}\n')
+
+        elif ai_type == 'seg':
+            res = mmseg.apis.inference_segmentor(model, frame)[0]
+            unique_ic, unique_count = np.unique(res, return_counts=True)
+            for ic, count in zip(unique_ic, unique_count):
+                if ic == 0: # skip background
+                    continue
+                if count < 800: # keep only degradations big enough
+                    continue
+                
+                degradation_name = list(classes_AI.items())[ic-1][1] # ic-1 to ignore background
+                if degradation_name != '':
+                    idx = classes_comp[degradation_name]
+                    
+                    length_AI[idx].append(d)
+                    length_AI_score[idx].append(1) # dummy score
+            
+    return length_AI, length_AI_score, length_video, extract_path
