@@ -118,8 +118,16 @@ def parse_videocoding(jsonpath):
     version = content["version"]
 
     classes = {r["id"]: r["name"] for r in content["rubrics"]}
+    # Class -9999 is "images"
+    try:
+        del classes[-9999]
+    except:
+        pass
+        
     classnames = [] # including subclasses (e.g. gravité)
     for r in content["rubrics"]:
+        if r["id"]==-9999:
+            continue
         for sub in r['parts'][0]['lexicons']:
             classnames.append(f'{r["name"]} {sub["value"]}')
     classname_to_deg_index = {name: i for i, name in enumerate(classnames)}
