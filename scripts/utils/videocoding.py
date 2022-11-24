@@ -7,6 +7,7 @@ from scipy.interpolate import interp1d
 import cv2 as cv
 import os
 import glob
+import sys
 
 
 def strip_accents(s):
@@ -207,6 +208,19 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
     Return length from start of mission for videocding and predictions.
     '''
     classes, degradations, timestamps = parse_videocoding(jsonpath)
+
+    miss_count = 0
+    for cls in classes:
+        if strip_accents(cls) not in classes_vid.keys():
+            miss_count += 1
+            print(strip_accents(cls))
+    if miss_count > 0:
+        print('\nVideocoded classes do not correspond to classes given with --cls_config...')
+        print('Expected classes are:')
+        for cls in classes:
+            print(strip_accents(cls))
+        print('')
+        sys.exit()
 
     traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
     classname_to_deg_index = {name: i for i, name in enumerate(classes)}

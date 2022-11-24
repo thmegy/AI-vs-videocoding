@@ -1,0 +1,65 @@
+{
+    // dict to link classes from videocoding and AI to classes used for comparison
+    classes_vid : {
+	'Affaissement de rive Avec accotement' : ''
+	'Affaissement de rive Sans accotement' : ''
+	'Affaissement hors rive Grave' : ''
+	
+	'Ornierage Grave' : ''
+	
+	'Arrachement Plumage' : 'Arrachement_pelade'
+	'Arrachement Peignage' : 'Arrachement_pelade'
+	'Arrachement Pelade' : 'Arrachement_pelade'
+	
+	'Faiencage Significatif' : 'Faiencage'
+	'Faiencage Grave' : 'Faiencage'
+	
+	'Fissure transversale Pontee' : 'Pontage'
+	'Fissure transversale Significatif' : 'Transversale'
+	'Fissure transversale Grave' : 'Transversale'
+	
+	'Fissure longitudinale Pontee' : 'Pontage'
+	'Fissure longitudinale Significatif' : 'Longitudinale'
+	'Fissure longitudinale Grave' : 'Longitudinale'
+	
+	'Fissure thermique Presence' : ''
+	
+	'Reparation en BB sur decoupe Petite largeur' : 'Remblaiement_de_tranchees'
+	'Reparation en BB sur decoupe Pleine largeur' : 'Remblaiement_de_tranchees'
+	
+	'Autres reparations Petite largeur' : 'Autre_reparation'
+	'Autres reparations Pleine largeur' : 'Autre_reparation'
+	
+	'Glacage - Ressuage Localise' : ''
+	'Glacage - Ressuage Generalise' : ''
+    }
+    
+    classes_AI : {
+	'Arrachement_pelade' : 'Arrachement_pelade',
+	'Faiencage' : 'Faiencage',
+	'Nid_de_poule' : 'Nid_de_poule',
+	'Transversale' : 'Transversale',
+	'Longitudinale' : 'Longitudinale',
+	'Pontage_de_fissures' : 'Pontage',
+	'Remblaiement_de_tranchees' : 'Remblaiement_de_tranchees',
+	'Raccord_de_chaussee' : '',
+	'Comblage_de_trou_ou_Projection_d_enrobe' : 'Autre_reparation',
+	'Bouche_a_clef' : '',
+	'Grille_avaloir' : '',
+	'Regard_tampon' : ''
+    }
+    
+    
+    // classes used for comparison
+    classes_comp : {
+	'Arrachement_pelade' : 0,
+	'Faiencage' : 1,
+	'Nid_de_poule' : 2,
+	'Transversale' : 3,
+	'Longitudinale' : 4,
+	'Remblaiement_de_tranchees' : 5,
+	'Pontage' : 6,
+	'Autre_reparation' : 7,
+    }
+
+}

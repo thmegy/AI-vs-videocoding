@@ -328,8 +328,8 @@ if __name__ == '__main__':
     parser.add_argument('--config', required=True)
     parser.add_argument('--checkpoint', required=True)
     
-    parser.add_argument('--cls_config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
-    parser.add_argument('--videocoding_config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
+    parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
+    parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     parser.add_argument('--threshold-dist', type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
