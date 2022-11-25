@@ -62,4 +62,17 @@
 	'Autre_reparation' : 7,
     }
 
+    
+    // weight associated to each class, coming from formula to grade road segments
+    cls_weight : {
+	'Arrachement_pelade' : 5,
+	'Faiencage' : 7,
+	'Nid_de_poule' : 5,
+	'Transversale' : 1.5,
+	'Longitudinale' : 6,
+	'Remblaiement_de_tranchees' : 2,
+	'Autre_reparation' : 2,
+	'Pontage' : 3,
+    }
+    
 }

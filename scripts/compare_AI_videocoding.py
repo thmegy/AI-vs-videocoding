@@ -12,21 +12,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import strip_accents, Haversine_distance, parse_gps_info, parse_videocoding, get_length_timestamp_map, extract_lengths
-
-
-def compute_smallest_distances(length_1, length_2):
-    # compute smallest distance for each element of length_1 wrt length_2 (arrays or lists)
-    distances = []        
-    for l1 in length_1:
-        if len(length_2) > 0:
-            dist = np.abs(l1 - np.array(length_2))
-            smallest_dist = np.min(dist)
-        else:
-            smallest_dist = 50
-        distances.append(smallest_dist)
-    return np.array(distances)
-
+from utils import extract_lengths, compute_smallest_distances
 
 
 def compute_average_precision(distances_AI, score, threshold):
@@ -225,10 +211,6 @@ def main(args):
             
     # treat a single video
     else:
-        if args.extract_disagreement:
-            thrs = [args.threshold_score]
-            disagreement_dict = {'FP':{}, 'FN':{}}
-            
         outpath = f'results_comparison/{args.type}/{args.inputvideo.split("/")[-1].replace(".mp4", "")}'
         os.makedirs(outpath, exist_ok=True)
             
@@ -281,13 +263,6 @@ def main(args):
                 distances_AI = compute_smallest_distances(lai_thr, lv)
                 distances_video = compute_smallest_distances(lv, lai_thr)
 
-                # extract frames with disagreement between AI and videocoding
-                if args.extract_disagreement:
-                    # AI predictions but no videocoding annotations (FP)
-                    disagreement_dict['FP'][class_name] = np.sort(lai_thr[distances_AI>10]).tolist()
-                    # videocoding annotations but no AI predictions (FN)
-                    disagreement_dict['FN'][class_name] = np.sort(np.array(lv)[distances_video>10]).tolist()
-
                 # plot
                 plot_distance_distributions(distances_AI, distances_video, outpath, class_name, thr)
 
@@ -306,12 +281,8 @@ def main(args):
         with open(f'{outpath}/results.json', 'w') as fout:
             json.dump(results, fout, indent = 6)
 
-        if args.extract_disagreement:
-            with open(f'{extract_path}/disagreement_dict.json', 'w') as fout:
-                json.dump(disagreement_dict, fout, indent = 6)
-        else:# do not plot metrics in disagreement extraction mode
-            for dthr in args.threshold_dist:
-                plot_precision_recall(results, dthr, thrs, outpath, classes_comp)
+        for dthr in args.threshold_dist:
+            plot_precision_recall(results, dthr, thrs, outpath, classes_comp)
             
 
             
@@ -336,9 +307,6 @@ if __name__ == '__main__':
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
 
     parser.add_argument('--filter-road', action='store_true', help='Apply segmentation model to keep only road pixels on images.')
-
-    parser.add_argument('--extract-disagreement', action='store_true', help='Extract frames where AI and videocoding disagree (distance > 10m).')
-    parser.add_argument('--threshold-score', type=float, default=0.3, help='score threshold to be used for disagreement extraction.')
     
     args = parser.parse_args()
 

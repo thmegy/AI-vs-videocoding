@@ -198,6 +198,20 @@ def get_length_timestamp_map(geoptis_csvpath):
 
 
 
+def compute_smallest_distances(length_1, length_2):
+    # compute smallest distance for each element of length_1 wrt length_2 (arrays or lists)
+    distances = []        
+    for l1 in length_1:
+        if len(length_2) > 0:
+            dist = np.abs(l1 - np.array(length_2))
+            smallest_dist = np.min(dist)
+        else:
+            smallest_dist = 50
+        distances.append(smallest_dist)
+    return np.array(distances)
+
+
+
 
 def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                     classes_vid, classes_AI, classes_comp,
@@ -372,7 +386,10 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
         elif ai_type == 'det':
             ann = []
             
-            res = mmdet.apis.inference_detector(model, frame)
+            try:
+                res = mmdet.apis.inference_detector(model, frame)
+            except:
+                continue
             image_width = frame.shape[1]
             image_height = frame.shape[0]
             for ic, c in enumerate(res): # loop on classes

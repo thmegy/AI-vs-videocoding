@@ -3,3 +3,7 @@ plots/
 results_comparison/
 *mp4
 *~
+checkpoints/
+prepare_annotations/images_to_annotate*
+prepare_annotations/processed_videos/
+scripts/utils/__pycache__/
