@@ -95,6 +95,7 @@ def main(args):
     
     for vid, jjson in zip(vid_list, json_list):
         print(f'\nProcessing {vid}')
+        print(jjson)
         disagreement_dict = {'FP':{}, 'FN':{}}
 
         length_AI, length_AI_score, length_video, extract_path = extract_lengths(
@@ -183,11 +184,15 @@ def main(args):
     rev_disagreement_dict = revert_dict(disagreement_dict['FP'], FN_dict, full_list) # reverted disagreement dict (key=frames, value=list of classes)
             
     uncertainty = []
-    for im in full_list:
+    for im in tqdm.tqdm(full_list):
         weight = 0
         for cls in rev_disagreement_dict[im]: # weigh uncertainty by importance of degradation class
             weight += cls_weight[cls]
-        uncertainty.append( mmdet.apis.inference_detector(model, im, active_learning=True)*weight )
+        try:
+            uncertainty.append( mmdet.apis.inference_detector(model, im, active_learning=True)*weight )
+        except:
+            print(im)
+            uncertainty.append(torch.tensor([0]))
 
     uncertainty = torch.concat(uncertainty)
     selection = select_images(test_cfg.active_learning.selection_method, uncertainty, args.n_sel_al, **test_cfg.active_learning.selection_kwargs)
@@ -199,7 +204,7 @@ def main(args):
     os.makedirs(f'{outpath}/FN/', exist_ok=True)
     os.makedirs(f'{outpath}/FP/', exist_ok=True)
 
-    for idx in selection:
+    for idx in tqdm.tqdm(selection):
         im = full_list[idx]
 
         # find if image is FN
@@ -208,7 +213,7 @@ def main(args):
             if im in images:
                 cls_list.append(cls)
         
-        video_name = im.split('/')[-4]
+        video_name = im.split('/')[-3]
         im_name = int(float(im.split('/')[-1].replace('.png', '')))
         im_path = im.replace(' ', '\ ')
         if len(cls_list) == 0:
@@ -223,7 +228,11 @@ def main(args):
 
         ann = []
             
-        res = mmdet.apis.inference_detector(model, image)
+        try:
+            res = mmdet.apis.inference_detector(model, image)
+        except:
+            print(im_name_new)
+            os.system(f'rm {im_name_new}')
         image_width = image.shape[1]
         image_height = image.shape[0]
         for ic, c in enumerate(res): # loop on classes

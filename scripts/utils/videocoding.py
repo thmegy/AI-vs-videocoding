@@ -8,6 +8,7 @@ import cv2 as cv
 import os
 import glob
 import sys
+import tqdm
 
 
 def strip_accents(s):
@@ -240,9 +241,6 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
     classname_to_deg_index = {name: i for i, name in enumerate(classes)}
     deg_index_to_classname = {i: name for name, i in classname_to_deg_index.items()}
 
-    if degradations.shape[0] == 0:
-        return 0, 0
-
     cam = cv.VideoCapture(videopath)
     framerate = cam.get(cv.CAP_PROP_FPS)
 
@@ -371,7 +369,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
         )
 
     # run inference on extracted frames
-    for fname in extracted_frames:
+    for fname in tqdm.tqdm(extracted_frames):
         d = float(fname.split('/')[-1].replace('.png', ''))
         frame = cv.imread(fname)
         
@@ -389,6 +387,8 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
             try:
                 res = mmdet.apis.inference_detector(model, frame)
             except:
+                print(fname)
+                os.system(f'rm {fname}')
                 continue
             image_width = frame.shape[1]
             image_height = frame.shape[0]
@@ -428,5 +428,6 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                     
                     length_AI[idx].append(d)
                     length_AI_score[idx].append(1) # dummy score
-            
+
+
     return length_AI, length_AI_score, length_video, extract_path
