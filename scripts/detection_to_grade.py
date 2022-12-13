@@ -99,14 +99,14 @@ def test_loop(dataloader, model, loss_fn):
 
 def main(args):
     if torch.cuda.is_available():
-        device = torch.device('cuda:0')
+        device = torch.device('cuda:1')
     else:
         device = torch.device('cpu')
         
     model = GradeFC(device)
     learning_rate = 1e-4
-    batch_size = 256
-    epochs = 600
+    batch_size = 64
+    epochs = 2000
 
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
@@ -124,7 +124,7 @@ def main(args):
         test_loss_list = []
         test_epochs = []
         for t in tqdm.tqdm(range(1, epochs+1)):
-            if t%25 == 0:
+            if t%200 == 0:
                 print(f"Epoch {t}\n-------------------------------")
                 train_loss = train_loop(train_loader, model, loss_fn, optimizer, printout=True)
                 test_loss = test_loop(test_loader, model, loss_fn)
@@ -156,14 +156,34 @@ def main(args):
     with torch.no_grad():
         for X, y in tqdm.tqdm(test_loader):
             pred = model(X)
-            pred_list += (10*pred).tolist()
-            eval_diff += (10*loss_fn(pred, y)).tolist()
-            target_list += (10*y).tolist()
+            pred_list += (10*pred.squeeze()).tolist()
+            eval_diff += (10*loss_fn(pred, y).squeeze()).tolist()
+            target_list += (10*y.squeeze()).tolist()
 
     print(np.histogram(eval_diff, bins=np.linspace(0, 10, 21)))
-    print(np.histogram(pred_list, bins=np.linspace(0, 10, 21)))
-    print(np.histogram(target_list, bins=np.linspace(0, 10, 21)))
-            
+    preds, bins_pred = np.histogram(pred_list, bins=np.linspace(0, 10, 21))
+    targets, bins_target = np.histogram(target_list, bins=np.linspace(0, 10, 21))
+
+    bins = np.cumsum(np.diff(bins_pred))
+    
+    fig2, ax2 = plt.subplots()
+    ax2.bar(bins, preds, label='Prédiction', alpha=0.5, width=0.25)
+    ax2.bar(bins, targets, label='Target', alpha=0.5, width=0.25)
+    ax2.legend()
+    ax2.set_xlabel('Note')
+    ax2.set_ylabel('#Tronçons')
+    fig2.savefig('pred_target_distribution.png')
+
+    matrix, _, _ = np.histogram2d(pred_list, target_list, bins=(np.linspace(0, 10, 11),np.linspace(0, 10, 11)))
+    matrix = matrix / matrix.sum(axis=0)
+
+    fig3, ax3 = plt.subplots()
+    c = ax3.pcolor(matrix, cmap='Greens')
+    ax3.set_ylabel('Note Prédite')
+    ax3.set_xlabel('Note cible')
+    fig3.colorbar(c)
+    fig3.savefig('pred_target_2d.png')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
