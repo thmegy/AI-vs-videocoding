@@ -216,7 +216,7 @@ def compute_smallest_distances(length_1, length_2):
 
 def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                     classes_vid, classes_AI, classes_comp,
-                    ai_type, ai_config, ai_checkpoint, process_every_nth_meter, filter_road=False):
+                    ai_type, ai_config, ai_checkpoint, process_every_nth_meter, filter_road=False, device='cuda:0'):
     '''
     Extract a frame of the video every n meter.
     Run inference on extracted images with pretrained model.
@@ -325,7 +325,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
             road_filter = init_segmentor(
                 '/home/theo/workdir/mmseg/mmsegmentation/configs/segformer/segformer_mit-b2_8x1_1024x1024_160k_cityscapes.py',
                 '/home/theo/workdir/mmseg/checkpoints/segformer_mit-b2_8x1_1024x1024_160k_cityscapes_20211207_134205-6096669a.pth',
-                device=f'cuda:1'
+                device=device
             )
 
             for fname in extracted_frames:
@@ -351,21 +351,21 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
         model = mmcls.apis.init_model(
             ai_config,
             ai_checkpoint,
-            device='cuda:0',
+            device=device,
         )
     elif ai_type == 'det':
         import mmdet.apis
         model = mmdet.apis.init_detector(
             ai_config,
             ai_checkpoint,
-            device='cuda:0',
+            device=device,
         )
     elif ai_type == 'seg':
         import mmseg.apis
         model = mmseg.apis.init_segmentor(
             ai_config,
             ai_checkpoint,
-            device='cuda:0',
+            device=device,
         )
 
     # run inference on extracted frames
@@ -388,7 +388,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                 res = mmdet.apis.inference_detector(model, frame)
             except:
                 print(fname)
-                os.system(f'rm {fname}')
+                os.system(f'rm "{fname}"')
                 continue
             image_width = frame.shape[1]
             image_height = frame.shape[0]

@@ -40,6 +40,8 @@ def main(args):
     Select 5 videocoded videos from input directory, find frames with disagreement between AI and videocoding, apply active learning to keep only N frames to annotate
     '''
 
+    device = f'cuda:{args.gpu_id}'
+    
     # make list of videos available
     input_vid_list = glob.glob(f'{args.inputpath_mp4}/*mp4')
     input_vid_list_tmp = input_vid_list.copy()
@@ -101,7 +103,8 @@ def main(args):
         length_AI, length_AI_score, length_video, extract_path = extract_lengths(
             jjson, vid, vid.replace('mp4', 'csv'),
             classes_vid, classes_AI, classes_comp,
-            'det', args.config, args.checkpoint, args.process_every_nth_meter, filter_road=False
+            'det', args.config, args.checkpoint, args.process_every_nth_meter,
+            filter_road=False, device=device
         )
 
         # loop over classes
@@ -171,7 +174,7 @@ def main(args):
     model = mmdet.apis.init_detector(
         args.config,
         args.checkpoint,
-        device='cuda:0',
+        device=device,
     )
 
     # active learning to keep only N frames to annotate
@@ -192,7 +195,7 @@ def main(args):
             uncertainty.append( mmdet.apis.inference_detector(model, im, active_learning=True)*weight )
         except:
             print(im)
-            uncertainty.append(torch.tensor([0]))
+            uncertainty.append(torch.tensor([0], device=device))
 
     uncertainty = torch.concat(uncertainty)
     selection = select_images(test_cfg.active_learning.selection_method, uncertainty, args.n_sel_al, **test_cfg.active_learning.selection_kwargs)
@@ -232,7 +235,8 @@ def main(args):
             res = mmdet.apis.inference_detector(model, image)
         except:
             print(im_name_new)
-            os.system(f'rm {im_name_new}')
+            os.system(f'rm "{im_name_new}"')
+            continue
         image_width = image.shape[1]
         image_height = image.shape[0]
         for ic, c in enumerate(res): # loop on classes
@@ -264,6 +268,8 @@ if __name__ == '__main__':
     parser.add_argument('--threshold-dist', type=float, default=10, help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
     parser.add_argument('--threshold-score', type=float, default=0.3, help='score threshold to be used for disagreement extraction.')
     parser.add_argument('--n-sel-al', type=float, default=1000, help='Number of frames to select with Active Learning for annotation.')
+
+    parser.add_argument('--gpu-id', type=int, default=0)
     
     args = parser.parse_args()
 
