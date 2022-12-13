@@ -45,7 +45,7 @@ data = dict(
     train=dict(
         type='CocoDataset',
         ann_file='data/cracks_12_classes/cracks_train.json',
-        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_10746_images/',
+        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_11746_images/',
         pipeline=[
             dict(type='LoadImageFromFile'),
             dict(type='LoadAnnotations', with_bbox=True),
@@ -72,7 +72,7 @@ data = dict(
     val=dict(
         type='CocoDataset',
         ann_file='data/cracks_12_classes/cracks_val_test.json',
-        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_10746_images/',
+        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_11746_images/',
         pipeline=[
             dict(type='LoadImageFromFile'),
             dict(
@@ -100,7 +100,7 @@ data = dict(
     test=dict(
         type='CocoDataset',
         ann_file='data/cracks_12_classes/cracks_val_test.json',
-        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_10746_images/',
+        img_prefix='/home/finn/DATASET/CRACKS/Logiroad_11746_images/',
         pipeline=[
             dict(type='LoadImageFromFile'),
             dict(
@@ -221,8 +221,8 @@ model = dict(
             score_method='Entropy',
             aggregation_method='sum',
             selection_method='maximum',
-            n_sel=500,
-            selection_kwargs=dict(batch_size=10),
+            n_sel=25,
+            selection_kwargs=dict(batch_size=50),
             alpha=0.5)))
 classes = ('Arrachement_pelade', 'Faiencage', 'Nid_de_poule', 'Transversale',
            'Longitudinale', 'Pontage_de_fissures', 'Remblaiement_de_tranchees',

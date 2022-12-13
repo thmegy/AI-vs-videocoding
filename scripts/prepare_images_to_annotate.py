@@ -74,8 +74,8 @@ def main(args):
             input_vid_list_tmp.remove(vid)
     input_vid_list = input_vid_list_tmp
 
-    # select randomly  5 videos to process
-    idx_list = random.sample(range(len(input_vid_list)), 5)
+    # select randomly 8 videos to process
+    idx_list = random.sample(range(len(input_vid_list)), 8)
     vid_list = []
     json_list = []
     for idx in idx_list:
