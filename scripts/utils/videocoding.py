@@ -310,10 +310,10 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
             d_init = d
 
             # save frame
-            cv.imwrite(f'{extract_path}/{d}.png', frame)
+            cv.imwrite(f'{extract_path}/{d}.jpg', frame)
 
 
-    extracted_frames = glob.glob(f'{extract_path}/*.png')
+    extracted_frames = glob.glob(f'{extract_path}/*.jpg')
 
     # road segmentation
     if filter_road:
@@ -339,7 +339,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                 im_name = fname.split('/')[-1]
                 cv.imwrite(f'{extract_path}/{im_name}', frame)
 
-        extracted_frames = glob.glob(f'{extract_path}/*.png')
+        extracted_frames = glob.glob(f'{extract_path}/*.jpg')
 
                 
 #    ann_path = f'{extract_path}/det_inference_thr_03/'
@@ -370,7 +370,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
 
     # run inference on extracted frames
     for fname in tqdm.tqdm(extracted_frames):
-        d = float(fname.split('/')[-1].replace('.png', ''))
+        d = float(fname.split('/')[-1].replace('.jpg', ''))
         frame = cv.imread(fname)
         
         if ai_type == 'cls':
@@ -408,7 +408,7 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
 #                    if p[4] > 0.3:
 #                        ann.append(f'{ic} {(x1+x2)/2/image_width} {(y1+y2)/2/image_height} {(x2-x1)/image_width} {(y2-y1)/image_height}')
 #                        
-#            ann_name = fname.replace('.png', '.txt').replace(extract_path, ann_path)
+#            ann_name = fname.replace('.jpg', '.txt').replace(extract_path, ann_path)
 #            with open(ann_name, 'w') as f:
 #                for a in ann:
 #                    f.write(f'{a}\n')

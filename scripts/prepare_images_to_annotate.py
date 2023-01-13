@@ -21,7 +21,7 @@ def revert_dict(FP_dict, FN_dict, im_list):
     rev_dict = {}
     for im in im_list:
         cls_list = []
-        im_name = float(im.split('/')[-1].replace('.png', ''))
+        im_name = float(im.split('/')[-1].replace('.jpg', ''))
         for cls, images in FP_dict.items():
             if im_name in images:
                 cls_list.append(cls)
@@ -37,7 +37,7 @@ def revert_dict(FP_dict, FN_dict, im_list):
 
 def main(args):
     '''
-    Select 5 videocoded videos from input directory, find frames with disagreement between AI and videocoding, apply active learning to keep only N frames to annotate
+    Select 8 videocoded videos from input directory, find frames with disagreement between AI and videocoding, apply active learning to keep only N frames to annotate
     '''
 
     device = f'cuda:{args.gpu_id}'
@@ -86,6 +86,7 @@ def main(args):
     
     ########### loop over selected videos : extract frames every nth meter from video, then find frames with disagreement between AI and videocoding ##############
     full_list = []
+    FP_dict = {}
     FN_dict = {}
 
     # load dicts to link classes from AI and videocoding
@@ -126,28 +127,33 @@ def main(args):
 
         with open(f'{extract_path}/disagreement_dict.json', 'w') as fout:
             json.dump(disagreement_dict, fout, indent = 6)
-            
 
+        
         # Make list of frames with disagreement between AI and videocoding
         # False Positive: simply send images for annotation
         FP_list = []
-        for key, val in disagreement_dict['FP'].items():
+        for cls, val in disagreement_dict['FP'].items():
             FP_list += val
+            frames_list = [f'{extract_path}/{v}.jpg' for v in val]
+            try:
+                FP_dict[cls] += frames_list
+            except:
+                FP_dict[cls] = frames_list
 
-        FP_list = [f'{extract_path}/{im}.png' for im in FP_list]
+        FP_list = [f'{extract_path}/{im}.jpg' for im in FP_list]
         full_list += FP_list
 
         # False Negatives: take saved frame closest to extracted length + surrounding frames
-        saved_frames = glob.glob(f'{extract_path}/*png')
-        saved_frames = np.sort(np.array([float(sf.replace(extract_path, '').replace('/', '').replace('.png', '')) for sf in saved_frames]))
+        saved_frames = glob.glob(f'{extract_path}/*jpg')
+        saved_frames = np.sort(np.array([float(sf.replace(extract_path, '').replace('/', '').replace('.jpg', '')) for sf in saved_frames]))
 
         FN_list = []
         for cls, val in disagreement_dict['FN'].items():
             frames_list = []
             for v in val:
                 idx = np.argmin(np.abs(saved_frames - v))
-                FN_list.append(f'{extract_path}/{saved_frames[idx]}.png')
-                frames_list.append(f'{extract_path}/{saved_frames[idx]}.png')
+                FN_list.append(f'{extract_path}/{saved_frames[idx]}.jpg')
+                frames_list.append(f'{extract_path}/{saved_frames[idx]}.jpg')
 #                try:
 #                    FN_list.append(saved_frames[idx-1])
 #                except:
@@ -168,7 +174,6 @@ def main(args):
     full_list = list(set(full_list))
     print(len(full_list))
 
-    
     ########### load AI model for active learning and pre-annotation #####################
     import mmdet.apis
     model = mmdet.apis.init_detector(
@@ -184,7 +189,7 @@ def main(args):
     except:
         test_cfg = config.model.test_cfg
 
-    rev_disagreement_dict = revert_dict(disagreement_dict['FP'], FN_dict, full_list) # reverted disagreement dict (key=frames, value=list of classes)
+    rev_disagreement_dict = revert_dict(FP_dict, FN_dict, full_list) # reverted disagreement dict (key=frames, value=list of classes)
             
     uncertainty = []
     for im in tqdm.tqdm(full_list):
@@ -198,8 +203,8 @@ def main(args):
             uncertainty.append(torch.tensor([0], device=device))
 
     uncertainty = torch.concat(uncertainty)
-    selection = select_images(test_cfg.active_learning.selection_method, uncertainty, args.n_sel_al, **test_cfg.active_learning.selection_kwargs)
-
+    selection = select_images(test_cfg.active_learning.selection_method, uncertainty, int(args.n_sel_al), **test_cfg.active_learning.selection_kwargs)
+    
     # copy images to annotate and pre-annotate them with detection model
     dt = datetime.datetime.now()
     timestamp = f'{dt.year}{dt.month}{dt.day}_{dt.hour}{dt.minute}'
@@ -217,14 +222,14 @@ def main(args):
                 cls_list.append(cls)
         
         video_name = im.split('/')[-3]
-        im_name = int(float(im.split('/')[-1].replace('.png', '')))
+        im_name = int(float(im.split('/')[-1].replace('.jpg', '')))
         im_path = im.replace(' ', '\ ')
         if len(cls_list) == 0:
-            im_name_new = f'{outpath}/FP/{video_name.replace(" ", "")}_{im_name}.png'
+            im_name_new = f'{outpath}/FP/{video_name.replace(" ", "")}_{im_name}.jpg'
         else:
             FN_name = '_'.join(cls_list)
             os.makedirs(f'{outpath}/FN/{FN_name}', exist_ok=True)
-            im_name_new = f'{outpath}/FN/{FN_name}/{video_name.replace(" ", "")}_{im_name}.png'
+            im_name_new = f'{outpath}/FN/{FN_name}/{video_name.replace(" ", "")}_{im_name}.jpg'
         os.system(f'cp {im_path} {im_name_new}')
 
         image = cv.imread(im_name_new)
@@ -246,7 +251,7 @@ def main(args):
                 if p[4] > 0.3:
                     ann.append(f'{ic} {(x1+x2)/2/image_width} {(y1+y2)/2/image_height} {(x2-x1)/image_width} {(y2-y1)/image_height}')
                         
-        ann_name = im_name_new.replace('.png', '.txt')
+        ann_name = im_name_new.replace('.jpg', '.txt')
         with open(ann_name, 'w') as f:
             for a in ann:
                 f.write(f'{a}\n')
