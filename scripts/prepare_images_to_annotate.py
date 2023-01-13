@@ -153,16 +153,7 @@ def main(args):
             for v in val:
                 idx = np.argmin(np.abs(saved_frames - v))
                 FN_list.append(f'{extract_path}/{saved_frames[idx]}.jpg')
-                frames_list.append(f'{extract_path}/{saved_frames[idx]}.jpg')
-#                try:
-#                    FN_list.append(saved_frames[idx-1])
-#                except:
-#                    print(f'index {idx-1} out of range')
-#                try:
-#                    FN_list.append(saved_frames[idx+1])
-#                except:
-#                    print(f'index {idx+1} out of range')
-                    
+                frames_list.append(f'{extract_path}/{saved_frames[idx]}.jpg')                    
             # saved frames corresponding to false negatives
             try:
                 FN_dict[cls] += frames_list

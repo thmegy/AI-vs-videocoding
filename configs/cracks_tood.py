@@ -220,9 +220,9 @@ model = dict(
         active_learning=dict(
             score_method='Entropy',
             aggregation_method='sum',
-            selection_method='maximum',
+            selection_method='batch',
             n_sel=25,
-            selection_kwargs=dict(batch_size=50),
+            selection_kwargs=dict(batch_size=15),
             alpha=0.5)))
 classes = ('Arrachement_pelade', 'Faiencage', 'Nid_de_poule', 'Transversale',
            'Longitudinale', 'Pontage_de_fissures', 'Remblaiement_de_tranchees',
