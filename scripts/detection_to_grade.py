@@ -10,32 +10,37 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
-
+from collections import Counter
+from scipy.ndimage import convolve1d
+from scipy.ndimage import gaussian_filter1d
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import confusion_matrix
+from torch.utils.tensorboard import SummaryWriter
 
 
 class CustomDataset(Dataset):
-    def __init__(self, path, device, augmentation=None):
-        df = pd.read_csv(path)
+    def __init__(self, x, y, device, augmentation=None, do_lds=False, nbin=20):
 
-        x = df.iloc[:,2:].values
-        y = df['NOTE'].values
-        #y /= 10 # grade between 0 and 1
-        #y = np.digitize(df['NOTE'], bins=np.linspace(0, 10, 6)[1:-1])
-
-        self.x = torch.tensor(x,dtype=torch.float32, device=device)
-        self.y = torch.tensor(y,dtype=torch.float32, device=device)[:, None]
-        #self.y = torch.tensor(y, device=device)
+        self.x = torch.tensor(x, dtype=torch.float32, device=device)
+        self.y = torch.tensor(y, dtype=torch.float32, device=device)[:, None] / 10
         
         self.augmentation = augmentation
+        self.do_lds = do_lds
+        if do_lds:
+            lds_weights_per_bin = self.label_distribution_smoothing(nbin)
+            self.lds_weights = torch.tensor([ lds_weights_per_bin[ np.digitize(x, bins=np.linspace(0, 10, nbin)[1:-1]) ] for x in y ], dtype=torch.float32, device=device)
 
     def __len__(self):
         return len(self.y)
 
     def __getitem__(self, idx):
-        if self.augmentation is None:
-            return self.x[idx],self.y[idx]
-        else:
+        if self.augmentation is not None:
             return self.augmentation(self.x[idx]), self.augmentation(self.y[idx])
+        elif self.do_lds:
+            return self.x[idx], self.y[idx], self.lds_weights[idx]
+        else:
+            return self.x[idx], self.y[idx]
 
     def get_balance_weigths(self):
         class_sample_count = torch.unique(self.y, return_counts=True)[1]
@@ -43,8 +48,38 @@ class CustomDataset(Dataset):
         samples_weight = torch.tensor([weight[t] for t in self.y])
         return samples_weight
 
+    def label_distribution_smoothing(self, nbin):
+        '''
+        See https://arxiv.org/pdf/2102.09554.pdf
+        '''
+        hist = np.histogram(self.y.tolist(), bins=nbin)[0]
+
+        lds_kernel_window = get_lds_kernel_window(kernel='gaussian', ks=5, sigma=2)
+        
+        eff_label_dist = convolve1d(hist, weights=lds_kernel_window, mode='constant')
+        weight_per_bin = 1 / eff_label_dist
+
+        return weight_per_bin
+
 
         
+def get_lds_kernel_window(kernel, ks, sigma):
+    assert kernel in ['gaussian', 'triang', 'laplace']
+    half_ks = (ks - 1) // 2
+    if kernel == 'gaussian':
+        base_kernel = [0.] * half_ks + [1.] + [0.] * half_ks
+        kernel_window = gaussian_filter1d(base_kernel, sigma=sigma) / max(gaussian_filter1d(base_kernel, sigma=sigma))
+        # kernel = gaussian(ks)
+    elif kernel == 'triang':
+        kernel_window = triang(ks)
+    else:
+        laplace = lambda x: np.exp(-abs(x) / sigma) / (2. * sigma)
+        kernel_window = list(map(laplace, np.arange(-half_ks, half_ks + 1))) / max(map(laplace, np.arange(-half_ks, half_ks + 1)))
+
+    return kernel_window
+
+
+
 def gaussian_noise(x):
     return torch.clamp(torch.normal(x, 1), min=0, max=10)
 
@@ -73,8 +108,7 @@ class GradeFC(nn.Module):
         x = F.relu(x)
         
         output = self.fcout(x)
-        #output = torch.sigmoid(output)
-#        output = F.softmax(output, dim=1)
+        output = torch.sigmoid(output)
         
         return output
 
@@ -84,10 +118,14 @@ def train_loop(dataloader, model, loss_fn, optimizer, printout=False):
     num_batches = len(dataloader)
     train_loss = 0
     
+#    for batch, (X, y, w) in enumerate(dataloader):
     for batch, (X, y) in enumerate(dataloader):
         # Compute prediction and loss
         pred = model(X)
-        loss = loss_fn(pred, y)
+        loss = loss_fn(pred, y).squeeze()
+#        loss *= w # reweight loss according to lds smoothed distribution
+        loss = loss.mean()
+#        loss *= y.shape[0] # renormalise loss
         train_loss += loss.item()
         
         # Backpropagation
@@ -110,10 +148,10 @@ def test_loop(dataloader, model, loss_fn):
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
+#            pred = torch.clamp(pred, min=0, max=10)
             test_loss += loss_fn(pred, y).item()
 
     test_loss /= num_batches
-    print(f"Test Error: \n Avg loss: {test_loss:>4f} \n")
 
     return test_loss
 
@@ -124,71 +162,53 @@ def main(args):
         device = torch.device('cuda:1')
     else:
         device = torch.device('cpu')
+
+    writer = SummaryWriter(f'log_tensorboard/detection_to_grade/reg/{args.tb_dir}')
+        
+    df = pd.read_csv(args.dataset)
+    x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
+#    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
+    scaler = StandardScaler()
+    x_train = scaler.fit_transform( x_train )
+    x_test = scaler.transform( x_test )
+
+#    train_set = CustomDataset(x_train, y_train, device, augmentation=gaussian_noise)
+#    train_set = CustomDataset(x_train, y_train, device, do_lds=True)
+    train_set = CustomDataset(x_train, y_train, device)
+    test_set = CustomDataset(x_test, y_test, device)
+
+    train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set), shuffle=True)
+    test_loader = torch.utils.data.DataLoader(test_set, batch_size=len(test_set))
         
     model = GradeFC(device)
-    learning_rate = 2e-3
-    batch_size = 64
-    epochs = 300
+    learning_rate = 1e-4
+    epochs = 3000
 
-    loss_fn = nn.MSELoss()
-    #loss_fn = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    train_loss_fn = nn.MSELoss(reduction='none')
+    test_loss_fn = nn.L1Loss() # get loss for each individual element
 
-#    train_set = CustomDataset(args.train_set, device, augmentation=gaussian_noise)
-    train_set = CustomDataset(args.train_set, device)
-    test_set = CustomDataset(args.test_set, device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
-#    sample_weights = train_set.get_balance_weigths()
-#    train_sampler = torch.utils.data.WeightedRandomSampler(sample_weights, len(sample_weights))
-#    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, sampler=train_sampler)
-    train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size)
-
-    if args.eval:
-        model.load_state_dict(torch.load('detection_to_grade.pth'))
-    else:
-        train_loss_list = []
-        test_loss_list = []
-        test_epochs = []
+    if not args.eval:
         best_test_loss = None
         for t in tqdm.tqdm(range(1, epochs+1)):
-            if t%10 == 0:
-                print(f"Epoch {t}\n-------------------------------")
-                train_loss = train_loop(train_loader, model, loss_fn, optimizer, printout=True)
-                test_loss = test_loop(test_loader, model, loss_fn)
-                test_loss_list.append(test_loss)
-                test_epochs.append(t)
+            train_loss = train_loop(train_loader, model, train_loss_fn, optimizer)
+            writer.add_scalar('train/loss', train_loss, t)
+
+            test_loss = test_loop(test_loader, model, test_loss_fn)
+            writer.add_scalar('test/loss', test_loss, t)
+
+            if t%100 == 0:
                 # save model
                 if best_test_loss is None or test_loss < best_test_loss:
                     best_test_loss = test_loss
                     torch.save(model.state_dict(), 'detection_to_grade.pth')
                     print('Best epoch this far ! Saving weights.')
-            else:
-                train_loss = train_loop(train_loader, model, loss_fn, optimizer)
-            train_loss_list.append(train_loss)
         print("Done!")
-    
-        # plot loss
-        fig1, ax1 = plt.subplots()
-        ax1.plot(range(1, epochs+1), train_loss_list, label='train')
-        ax1.plot(test_epochs, test_loss_list, label='test')
-        ax1.legend()
-        ax1.set_xlabel('epoch')
-        ax1.set_ylabel('MSE')
-        fig1.savefig('loss.png')
 
     # evaluation
+    model.load_state_dict(torch.load('detection_to_grade.pth'))
     model.eval()
-
-#    pred_list = []
-#    logit_list = []
-#    with torch.no_grad():
-#        for X, y in tqdm.tqdm(test_loader):
-#            pred = model(X)
-#            pred_list += pred.argmax(dim=1).tolist()
-#
-#    print(pred_list)
-
 
     
     loss_fn = nn.L1Loss(reduction='none') # get loss for each individual element
@@ -197,7 +217,9 @@ def main(args):
     target_list = []
     with torch.no_grad():
         for X, y in tqdm.tqdm(test_loader):
-            pred = model(X)
+            pred = model(X) * 10
+            #pred = torch.clamp(pred, min=0, max=10)
+            y *= 10
             pred_list += (pred.squeeze()).tolist()
             eval_diff += (loss_fn(pred, y).squeeze()).tolist()
             target_list += (y.squeeze()).tolist()
@@ -208,6 +230,7 @@ def main(args):
     preds, bins_pred = np.histogram(pred_list, bins=np.linspace(0, 10, 21))
     targets, bins_target = np.histogram(target_list, bins=np.linspace(0, 10, 21))
 
+    print( confusion_matrix( np.digitize(target_list, bins=np.linspace(0, 10, 11)[1:-1]), np.digitize(pred_list, bins=np.linspace(0, 10, 11)[1:-1]) ) )
 #    print(min(pred_list))
     print(preds)
     print(targets)
@@ -242,8 +265,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--train-set', required=True)
-    parser.add_argument('--test-set', required=True)
+    parser.add_argument('--dataset', required=True)
+    parser.add_argument('--tb-dir', required=True, help='path to tensorboad log: log_tensorboard/detection_to_grade/cls/<tb-dir>')
     parser.add_argument('--eval', action='store_true')
     args = parser.parse_args()
 
