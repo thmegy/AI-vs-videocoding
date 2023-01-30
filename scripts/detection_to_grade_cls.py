@@ -75,7 +75,7 @@ class GradeFC(nn.Module):
         x = F.relu(x)
         
         output = self.fcout(x)
-        output = F.softmax(output, dim=1)
+        # no softmax, hanfle by cross entropy loss
         
         return output
 
@@ -168,7 +168,12 @@ def main(args):
             
             test_loss, pred_list, pred_score_list, target_list = test_loop(test_loader, model, test_loss_fn)
             writer.add_scalar('test/balanced_accuracy_score', balanced_accuracy_score(target_list, pred_list), t)
-            writer.add_scalar('test/top_k_accuracy_score', top_k_accuracy_score(target_list, pred_score_list), t)    
+            writer.add_scalar('test/top_k_accuracy_score', top_k_accuracy_score(target_list, pred_score_list), t)
+            prfs = precision_recall_fscore_support(target_list, pred_list, zero_division=0)
+            for cls in range(len(prfs[0])):
+                writer.add_scalar(f'test/precision_cls_{cls}', prfs[0][cls], t)    
+                writer.add_scalar(f'test/recall_cls_{cls}', prfs[1][cls], t)    
+                writer.add_scalar(f'test/fscore_cls_{cls}', prfs[2][cls], t)    
     
             if t%100 == 0:
                 # save model
