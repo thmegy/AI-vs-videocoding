@@ -15,7 +15,7 @@ from scipy.ndimage import convolve1d
 from scipy.ndimage import gaussian_filter1d
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, balanced_accuracy_score, precision_recall_fscore_support
 from torch.utils.tensorboard import SummaryWriter
 
 
@@ -23,7 +23,7 @@ class CustomDataset(Dataset):
     def __init__(self, x, y, device, augmentation=None, do_lds=False, nbin=20):
 
         self.x = torch.tensor(x, dtype=torch.float32, device=device)
-        self.y = torch.tensor(y, dtype=torch.float32, device=device)[:, None] / 10
+        self.y = torch.tensor(y, dtype=torch.float32, device=device)[:, None]
         
         self.augmentation = augmentation
         self.do_lds = do_lds
@@ -88,12 +88,10 @@ def gaussian_noise(x):
 class GradeFC(nn.Module):
     def __init__(self, device):
         super(GradeFC, self).__init__()
-        self.fc1 = nn.Linear(8, 64, device=device)
+        self.fc1 = nn.Linear(1, 64, device=device)
         self.fc2 = nn.Linear(64, 126, device=device)
         self.fc3 = nn.Linear(126, 252, device=device)
-        self.fc4 = nn.Linear(252, 126, device=device)
-        self.fc5 = nn.Linear(126, 64, device=device)
-        self.fcout = nn.Linear(64, 1, device=device)
+        self.fcout = nn.Linear(252, 1, device=device)
         
     def forward(self, x):
         x = self.fc1(x)
@@ -102,13 +100,9 @@ class GradeFC(nn.Module):
         x = F.relu(x)
         x = self.fc3(x)
         x = F.relu(x)
-        x = self.fc4(x)
-        x = F.relu(x)
-        x = self.fc5(x)
-        x = F.relu(x)
         
         output = self.fcout(x)
-        output = torch.sigmoid(output)
+        output = torch.sigmoid(output) * 10
         
         return output
 
@@ -144,30 +138,36 @@ def train_loop(dataloader, model, loss_fn, optimizer, printout=False):
 def test_loop(dataloader, model, loss_fn):
     num_batches = len(dataloader)
     test_loss = 0
+    pred_list = []
+    target_list = []
 
     with torch.no_grad():
         for X, y in dataloader:
             pred = model(X)
-#            pred = torch.clamp(pred, min=0, max=10)
             test_loss += loss_fn(pred, y).item()
+            pred_list += (pred.squeeze()).tolist()
+            target_list += (y.squeeze()).tolist()
 
     test_loss /= num_batches
 
-    return test_loss
+    target_list = np.digitize(target_list, bins=np.linspace(0, 10, 6)[1:-1])
+    pred_list = np.digitize(pred_list, bins=np.linspace(0, 10, 6)[1:-1])
+    
+    return test_loss, target_list, pred_list
 
 
 
 def main(args):
     if torch.cuda.is_available():
-        device = torch.device('cuda:1')
+        device = torch.device('cuda:0')
     else:
         device = torch.device('cpu')
 
     writer = SummaryWriter(f'log_tensorboard/detection_to_grade/reg/{args.tb_dir}')
         
     df = pd.read_csv(args.dataset)
-    x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
-#    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
+#    x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
+    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
     scaler = StandardScaler()
     x_train = scaler.fit_transform( x_train )
     x_test = scaler.transform( x_test )
@@ -195,8 +195,13 @@ def main(args):
             train_loss = train_loop(train_loader, model, train_loss_fn, optimizer)
             writer.add_scalar('train/loss', train_loss, t)
 
-            test_loss = test_loop(test_loader, model, test_loss_fn)
+            test_loss, target_list, pred_list = test_loop(test_loader, model, test_loss_fn)
             writer.add_scalar('test/loss', test_loss, t)
+            writer.add_scalar('test/balanced_accuracy_score', balanced_accuracy_score(target_list, pred_list), t)
+            prfs = precision_recall_fscore_support(target_list, pred_list, zero_division=0)
+            writer.add_scalar(f'test/average_precision', prfs[0].mean(), t)    
+            writer.add_scalar(f'test/average_recall', prfs[1].mean(), t)    
+            writer.add_scalar(f'test/average_fscore', prfs[2].mean(), t)    
 
             if t%100 == 0:
                 # save model
@@ -217,9 +222,7 @@ def main(args):
     target_list = []
     with torch.no_grad():
         for X, y in tqdm.tqdm(test_loader):
-            pred = model(X) * 10
-            #pred = torch.clamp(pred, min=0, max=10)
-            y *= 10
+            pred = model(X)
             pred_list += (pred.squeeze()).tolist()
             eval_diff += (loss_fn(pred, y).squeeze()).tolist()
             target_list += (y.squeeze()).tolist()

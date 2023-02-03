@@ -75,7 +75,7 @@ class GradeFC(nn.Module):
         x = F.relu(x)
         
         output = self.fcout(x)
-        # no softmax, hanfle by cross entropy loss
+        # no softmax, handle by cross entropy loss
         
         return output
 
