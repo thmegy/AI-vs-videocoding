@@ -189,17 +189,18 @@ def main(args):
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=len(test_set))
         
     model = GradeFC(device)
-    learning_rate = 1e-4
-    epochs = 10000
+    learning_rate = 1e-3
+    epochs = 3000
 
 #    train_loss_fn = nn.MSELoss(reduction='none')
     train_loss_fn = nn.GaussianNLLLoss(reduction='none')
     test_loss_fn = nn.L1Loss() # get loss for each individual element
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
+    
     if not args.eval:
-        best_test_loss = None
+        best_test_metric = None
         for t in tqdm.tqdm(range(1, epochs+1)):
             train_loss = train_loop(train_loader, model, train_loss_fn, optimizer)
             writer.add_scalar('train/loss', train_loss, t)
@@ -210,12 +211,16 @@ def main(args):
             prfs = precision_recall_fscore_support(target_list, pred_list, zero_division=0)
             writer.add_scalar(f'test/average_precision', prfs[0].mean(), t)    
             writer.add_scalar(f'test/average_recall', prfs[1].mean(), t)    
-            writer.add_scalar(f'test/average_fscore', prfs[2].mean(), t)    
+            writer.add_scalar(f'test/average_fscore', prfs[2].mean(), t)
+
+            writer.add_scalar('learning-rate', optimizer.param_groups[0]['lr'], t)
+            scheduler.step()
 
             if t%100 == 0:
+                test_metric = prfs[2].mean()
                 # save model
-                if best_test_loss is None or test_loss < best_test_loss:
-                    best_test_loss = test_loss
+                if best_test_metric is None or test_metric > best_test_metric:
+                    best_test_metric = test_metric
                     torch.save(model.state_dict(), 'detection_to_grade.pth')
                     print('Best epoch this far ! Saving weights.')
         print("Done!")
