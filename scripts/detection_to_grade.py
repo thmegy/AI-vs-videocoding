@@ -86,9 +86,9 @@ def gaussian_noise(x):
 
     
 class GradeFC(nn.Module):
-    def __init__(self, device):
+    def __init__(self, N_in, device):
         super(GradeFC, self).__init__()
-        self.fc1 = nn.Linear(1, 64, device=device)
+        self.fc1 = nn.Linear(N_in, 64, device=device)
         self.fc2 = nn.Linear(64, 126, device=device)
         self.fc3 = nn.Linear(126, 252, device=device)
         self.fcout = nn.Linear(252, 1, device=device)
@@ -166,8 +166,8 @@ def main(args):
     writer = SummaryWriter(f'log_tensorboard/detection_to_grade/reg/{args.tb_dir}')
         
     df = pd.read_csv(args.dataset)
-#    x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
-    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
+    x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
+#    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
     scaler = StandardScaler()
     x_train = scaler.fit_transform( x_train )
     x_test = scaler.transform( x_test )
@@ -180,7 +180,7 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set), shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=len(test_set))
         
-    model = GradeFC(device)
+    model = GradeFC(x_train.shape[1], device)
     learning_rate = 1e-4
     epochs = 3000
 
