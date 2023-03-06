@@ -1,5 +1,6 @@
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
+import torchmetrics
 import argparse, tqdm
 import pandas as pd
 import numpy as np
@@ -12,13 +13,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 mpl.use('Agg')
-from collections import Counter
-from scipy.ndimage import convolve1d
-from scipy.ndimage import gaussian_filter1d
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix, balanced_accuracy_score, precision_recall_fscore_support
-from torch.utils.tensorboard import SummaryWriter
+from sklearn.metrics import confusion_matrix
 
 
 
@@ -26,7 +23,10 @@ class LitModel(pl.LightningModule):
     def __init__(self, model):
         super(LitModel,self).__init__()
         self.model = model
-
+        self.concordance = torchmetrics.ConcordanceCorrCoef()
+        self.cosine = torchmetrics.CosineSimilarity()
+        self.explvar = torchmetrics.ExplainedVariance()
+        
     def forward(self, x):
         return self.model(x)
 
@@ -34,6 +34,7 @@ class LitModel(pl.LightningModule):
         x, y = batch
         y_hat = self.model(x)
         loss = F.mse_loss(y_hat, y)
+        self.log('train/loss', loss)
         return loss
     
     def configure_optimizers(self):
@@ -45,6 +46,13 @@ class LitModel(pl.LightningModule):
         y_hat = self.model(x)
         val_loss = F.l1_loss(y_hat, y)
         self.log("val_loss", val_loss)
+        concordance = self.concordance(y_hat.squeeze(), y.squeeze())
+        self.log("test/concordance_corr_coef", concordance)
+        cosine = self.cosine(y_hat.squeeze(), y.squeeze())
+        self.log("test/cosine_similarity", cosine)
+        explvar = self.explvar(y_hat.squeeze(), y.squeeze())
+        self.log("test/explained_variance", explvar)
+
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         x, y = batch
