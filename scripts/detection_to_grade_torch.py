@@ -14,7 +14,7 @@ from collections import Counter
 from scipy.ndimage import convolve1d
 from scipy.ndimage import gaussian_filter1d
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import confusion_matrix, balanced_accuracy_score, precision_recall_fscore_support
 from torch.utils.tensorboard import SummaryWriter
 
@@ -86,12 +86,12 @@ def gaussian_noise(x):
 
     
 class GradeFC(nn.Module):
-    def __init__(self, device):
+    def __init__(self, N_in, device):
         super(GradeFC, self).__init__()
-        self.fc1 = nn.Linear(8, 64, device=device)
+        self.fc1 = nn.Linear(N_in, 64, device=device)
         self.fc2 = nn.Linear(64, 126, device=device)
         self.fc3 = nn.Linear(126, 252, device=device)
-        self.fcout = nn.Linear(252, 2, device=device)
+        self.fcout = nn.Linear(252, 1, device=device)
         
     def forward(self, x):
         x = self.fc1(x)
@@ -102,12 +102,9 @@ class GradeFC(nn.Module):
         x = F.relu(x)
         
         output = self.fcout(x)
-        #output = torch.sigmoid(output)
-        mu = torch.sigmoid(output[:,0]) * 10
-        sigma = torch.sigmoid(output[:,1])
-
-        return mu, sigma
-#        return output
+        output = torch.sigmoid(output) * 10
+        
+        return output
 
 
 
@@ -118,12 +115,8 @@ def train_loop(dataloader, model, loss_fn, optimizer, printout=False):
 #    for batch, (X, y, w) in enumerate(dataloader):
     for batch, (X, y) in enumerate(dataloader):
         # Compute prediction and loss
-#        pred = model(X)
-#        loss = loss_fn(pred, y).squeeze()
-
-        mu, sigma = model(X)
-        loss = loss_fn(mu, y.squeeze(), sigma).squeeze()
-        
+        pred = model(X)
+        loss = loss_fn(pred, y).squeeze()
 #        loss *= w # reweight loss according to lds smoothed distribution
         loss = loss.mean()
 #        loss *= y.shape[0] # renormalise loss
@@ -150,8 +143,8 @@ def test_loop(dataloader, model, loss_fn):
 
     with torch.no_grad():
         for X, y in dataloader:
-            pred = model(X)[0]
-            test_loss += loss_fn(pred, y.squeeze()).item()
+            pred = model(X)
+            test_loss += loss_fn(pred, y).item()
             pred_list += (pred.squeeze()).tolist()
             target_list += (y.squeeze()).tolist()
 
@@ -175,8 +168,7 @@ def main(args):
     df = pd.read_csv(args.dataset)
     x_train, x_test, y_train, y_test = train_test_split(df.iloc[:,2:].values, df['NOTE'].values, test_size=0.2, random_state=1)
 #    x_train, x_test, y_train, y_test = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
-#    scaler = StandardScaler()
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
     x_train = scaler.fit_transform( x_train )
     x_test = scaler.transform( x_test )
 
@@ -188,19 +180,17 @@ def main(args):
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=len(train_set), shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=len(test_set))
         
-    model = GradeFC(device)
-    learning_rate = 1e-3
+    model = GradeFC(x_train.shape[1], device)
+    learning_rate = 1e-4
     epochs = 3000
 
-#    train_loss_fn = nn.MSELoss(reduction='none')
-    train_loss_fn = nn.GaussianNLLLoss(reduction='none')
+    train_loss_fn = nn.MSELoss(reduction='none')
     test_loss_fn = nn.L1Loss() # get loss for each individual element
 
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
-    
+
     if not args.eval:
-        best_test_metric = None
+        best_test_loss = None
         for t in tqdm.tqdm(range(1, epochs+1)):
             train_loss = train_loop(train_loader, model, train_loss_fn, optimizer)
             writer.add_scalar('train/loss', train_loss, t)
@@ -211,16 +201,12 @@ def main(args):
             prfs = precision_recall_fscore_support(target_list, pred_list, zero_division=0)
             writer.add_scalar(f'test/average_precision', prfs[0].mean(), t)    
             writer.add_scalar(f'test/average_recall', prfs[1].mean(), t)    
-            writer.add_scalar(f'test/average_fscore', prfs[2].mean(), t)
-
-            writer.add_scalar('learning-rate', optimizer.param_groups[0]['lr'], t)
-            scheduler.step()
+            writer.add_scalar(f'test/average_fscore', prfs[2].mean(), t)    
 
             if t%100 == 0:
-                test_metric = prfs[2].mean()
                 # save model
-                if best_test_metric is None or test_metric > best_test_metric:
-                    best_test_metric = test_metric
+                if best_test_loss is None or test_loss < best_test_loss:
+                    best_test_loss = test_loss
                     torch.save(model.state_dict(), 'detection_to_grade.pth')
                     print('Best epoch this far ! Saving weights.')
         print("Done!")
@@ -229,26 +215,27 @@ def main(args):
     model.load_state_dict(torch.load('detection_to_grade.pth'))
     model.eval()
 
+    
     loss_fn = nn.L1Loss(reduction='none') # get loss for each individual element
-
     eval_diff = []
     pred_list = []
-    sigma_list = []
     target_list = []
     with torch.no_grad():
         for X, y in tqdm.tqdm(test_loader):
-            pred, sigma = model(X)
+            pred = model(X)
             pred_list += (pred.squeeze()).tolist()
             eval_diff += (loss_fn(pred, y).squeeze()).tolist()
             target_list += (y.squeeze()).tolist()
-            sigma_list += (sigma.squeeze()).tolist()
 
     print(np.array(eval_diff).mean())
+    
+    print(np.histogram(eval_diff, bins=np.linspace(0, 10, 21)))
     preds, bins_pred = np.histogram(pred_list, bins=np.linspace(0, 10, 21))
     targets, bins_target = np.histogram(target_list, bins=np.linspace(0, 10, 21))
 
     print( confusion_matrix( np.digitize(target_list, bins=np.linspace(0, 10, 11)[1:-1]), np.digitize(pred_list, bins=np.linspace(0, 10, 11)[1:-1]) ) )
-    print(preds, max(pred_list), min(pred_list))
+#    print(min(pred_list))
+    print(preds)
     print(targets)
     
     bins = np.cumsum(np.diff(bins_pred))
@@ -276,12 +263,6 @@ def main(args):
     ax4.set_ylabel('Note Prédite')
     ax4.set_xlabel('Note cible')
     fig4.savefig('pred_target_scatter.png')
-
-    fig5, ax5 = plt.subplots()
-    ax5.scatter(target_list, sigma_list)
-    ax5.set_ylabel('sigma prédit')
-    ax5.set_xlabel('Note cible')
-    fig5.savefig('sigma_target_scatter.png')
 
 
 if __name__ == '__main__':
