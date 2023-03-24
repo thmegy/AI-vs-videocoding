@@ -15,7 +15,9 @@ import matplotlib as mpl
 mpl.use('Agg')
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, balanced_accuracy_score
+from sklearn.decomposition import PCA
+from scipy.stats import binned_statistic_dd
 import shap
 
 
@@ -62,11 +64,19 @@ class LitModel(pl.LightningModule):
         max_mixing_id = [[i for i in range(mixing.shape[0])], max_mixing_id.tolist()]
 
         # define predicted mean and aleatoric and epistemic uncertainties
-        mu = loc[max_mixing_id]
+        mu = torch.clamp(loc[max_mixing_id], max=10)
         sigma_al = torch.sqrt( scale[max_mixing_id] )
-        sigma_ep = torch.sqrt( ( mu - (loc*mixing).sum() )**2 )
+        sigma_ep = torch.sqrt( ( mu - (loc*mixing).sum(dim=1) )**2 )
 
-        return mu, sigma_al, sigma_ep, y
+        # compute probability distribution for each data point
+        eps = 10**-6
+        prob_list = []
+        for t in torch.linspace(0,10,41)[:-1]:
+            gaussian_prob = (mixing * torch.exp(-((t-loc)**2) / (2*scale**2)) / (scale * np.sqrt(2*np.pi)) + eps).sum(dim=1)
+            prob_list.append(gaussian_prob[:,None])
+        prob_dist = torch.cat(prob_list, dim=1)
+            
+        return mu, sigma_al, sigma_ep, y, mixing[max_mixing_id], prob_dist
 
 
 class CustomDataset(Dataset):
@@ -102,9 +112,13 @@ class GradeFC(nn.Module):
         output = self.fcout(x)
         output = output.reshape(x.shape[0], self.ncomp, 3) # rows are MDN components, columns are parameters of components (mu, sigma, pi)
         loc = torch.sigmoid(output[:,:,0]) * 10
+        loc = torch.exp(output[:,:,0])
+        
         sigma_max = 10 # arbitrary parameter
         scale = sigma_max * torch.sigmoid(output[:,:,1])
-        mixing = torch.exp(output[:,:,2] - output[:,:,2].max()) / torch.exp(output[:,:,2] - output[:,:,2].max()).sum()
+        
+        maxes = output[:,:,2].max(dim=1)[0][:,None] # get max of mixings for each data point
+        mixing = torch.exp(output[:,:,2] - maxes) / torch.exp(output[:,:,2] - maxes).sum(dim=1)[:,None]
         
         return loc, scale, mixing
 
@@ -145,6 +159,8 @@ def main(args):
 #    x_train, x_val, y_train, y_val = train_test_split(df['Moy_degradation'].values[:,None], df['NOTE'].values, test_size=0.2, random_state=1) # for fake data
     scaler = StandardScaler()
     x_train = scaler.fit_transform( x_train )
+#    x_train = x_train[(y_train<4)|(y_train>7)]
+#    y_train = y_train[(y_train<4)|(y_train>7)]
     x_val = scaler.transform( x_val )
 
     train_set = CustomDataset(x_train, y_train)
@@ -178,6 +194,7 @@ def main(args):
 #    test_set = CustomDataset(x_test, y_test)
 #    test_loader = torch.utils.data.DataLoader(test_set, batch_size=len(test_set))
 
+    x_test = x_val
     test_loader = val_loader
     
     # predict
@@ -187,81 +204,132 @@ def main(args):
     sigma_al_list = []
     sigma_ep_list = []
     target_list = []
-    for pred, sigma_al, sigma_ep, target in results:
+    mixing_list = []
+    prob_dist_list = []
+    for pred, sigma_al, sigma_ep, target, mixing, prob_dist in results:
         pred_list += pred.squeeze().tolist()
         sigma_al_list += sigma_al.squeeze().tolist()
         sigma_ep_list += sigma_ep.squeeze().tolist()
         target_list += target.squeeze().tolist()
-    
-    preds, bins_pred = np.histogram(pred_list, bins=np.linspace(0, 10, 21))
-    targets, bins_target = np.histogram(target_list, bins=np.linspace(0, 10, 21))
+        mixing_list += mixing.squeeze().tolist()
+        prob_dist_list.append( prob_dist )
 
-    print( confusion_matrix( np.digitize(target_list, bins=np.linspace(0, 10, 11)[1:-1]), np.digitize(pred_list, bins=np.linspace(0, 10, 11)[1:-1]) ) )
-#    print(min(pred_list))
+    # convert to numpy
+    prob_dist = torch.cat(prob_dist_list).numpy()
+    target = np.array(target_list)
+    pred = np.array(pred_list)
+    sigma_al = np.array(sigma_al_list)
+    sigma_ep = np.array(sigma_ep_list)
+    sigma_tot = np.sqrt(sigma_al**2 + sigma_ep**2)
+
+    preds, bins_pred = np.histogram(pred, bins=np.linspace(0, 10, 21))
+    targets, bins_target = np.histogram(target, bins=np.linspace(0, 10, 21))
+
+    print('')
+    print( 'Balanced accuracy: ', balanced_accuracy_score( np.digitize(target, bins=np.linspace(0, 10, 11)[1:-1]), np.digitize(pred, bins=np.linspace(0, 10, 11)[1:-1]) ) )
+    print('')
+    print( confusion_matrix( np.digitize(target, bins=np.linspace(0, 10, 11)[1:-1]), np.digitize(pred, bins=np.linspace(0, 10, 11)[1:-1]) ) )
+#    print(min(pred))
     print(preds)
     print(targets)
     
     bins = np.cumsum(np.diff(bins_pred))
     
-    fig2, ax2 = plt.subplots()
-    ax2.bar(bins, preds, label='Prédiction', alpha=0.5, width=0.25)
-    ax2.bar(bins, targets, label='Target', alpha=0.5, width=0.25)
-    ax2.legend()
-    ax2.set_xlabel('Note')
-    ax2.set_ylabel('#Tronçons')
-    fig2.savefig('pred_target_distribution.png')
+    fig, ax = plt.subplots()
+    ax.bar(bins, preds, label='Prédiction', alpha=0.5, width=0.25)
+    ax.bar(bins, targets, label='Target', alpha=0.5, width=0.25)
+    ax.legend()
+    ax.set_xlabel('Note')
+    ax.set_ylabel('#Tronçons')
+    fig.savefig('pred_target_distribution.png')
 
-    matrix, _, _ = np.histogram2d(pred_list, target_list, bins=(np.linspace(0, 10, 11),np.linspace(0, 10, 11)))
+    matrix, _, _ = np.histogram2d(pred, target, bins=(np.linspace(0, 10, 11),np.linspace(0, 10, 11)))
     matrix = matrix / matrix.sum(axis=0)
 
-    fig3, ax3 = plt.subplots()
-    c = ax3.pcolor(matrix, cmap='Greens')
-    ax3.set_ylabel('Note Prédite')
-    ax3.set_xlabel('Note cible')
-    fig3.colorbar(c)
-    fig3.savefig('pred_target_2d.png')
-
-    sigma_al = np.array(sigma_al_list)
-    sigma_ep = np.array(sigma_ep_list)
-    sigma_tot = np.sqrt(sigma_al**2 + sigma_ep**2)
+    fig, ax = plt.subplots()
+    c = ax.pcolor(matrix, cmap='Greens')
+    ax.set_ylabel('Note Prédite')
+    ax.set_xlabel('Note cible')
+    fig.colorbar(c)
+    fig.savefig('pred_target_2d.png')
     
-    fig4, ax4 = plt.subplots()
-    ax4.errorbar(target_list, pred_list, yerr=sigma_tot, fmt='o', color='red')
-    ax4.errorbar(target_list, pred_list, yerr=sigma_al, fmt='o')
-    ax4.set_ylabel('Note Prédite')
-    ax4.set_xlabel('Note cible')
-    fig4.savefig('pred_target_scatter.png')
+    fig, ax = plt.subplots()
+    ax.errorbar(target, pred, yerr=sigma_tot, fmt='none', color='red', label=r'$\sqrt{\sigma_{ep}^{2}+\sigma_{al}^{2}}$')
+    ax.errorbar(target, pred, yerr=sigma_ep, fmt='none', label='$\sigma_{ep}$')
+    ax.scatter(target, pred, marker='.', color='black')
+    ax.set_ylabel('Note Prédite')
+    ax.set_xlabel('Note cible')
+    ax.legend(loc='upper left')
+    fig.set_tight_layout(True)
+    fig.savefig('pred_target_scatter.png', dpi=200)
 
-    fig5, ax5 = plt.subplots()
-    ax5.scatter(target_list, sigma_al_list)
-    ax5.set_ylabel(r'$\sigma_{al}$')
-    ax5.set_xlabel('Note cible')
-    fig5.savefig('sigma_al_target_scatter.png')
+    # epistemic and aleatoric uncertainties vs target
+    fig, ax = plt.subplots()
+    ax.scatter(target, sigma_al)
+    ax.set_ylabel(r'$\sigma_{al}$')
+    ax.set_xlabel('Note cible')
+    fig.savefig('sigma_al_target_scatter.png')
 
-    fig6, ax6 = plt.subplots()
-    ax6.scatter(target_list, sigma_ep_list)
-    ax6.set_ylabel(r'$\sigma_{ep}$')
-    ax6.set_xlabel('Note cible')
-    fig6.savefig('sigma_ep_target_scatter.png')
+    fig, ax = plt.subplots()
+    ax.scatter(target, sigma_ep)
+    ax.set_ylabel(r'$\sigma_{ep}$')
+    ax.set_xlabel('Note cible')
+    fig.savefig('sigma_ep_target_scatter.png')
 
-#    # compute SHAP values
-#    batch = next(iter(test_loader))
-#    x_test, _ = batch
-#
-#    explainer = shap.DeepExplainer(model, x_test)
-#    shap_values = explainer.shap_values(x_test)
-#
-#    plt.figure()
-#    shap.summary_plot(shap_values, plot_type = 'bar', feature_names=df.columns[2:], show=False)
-#    plt.tight_layout()
-#    plt.savefig('shap_bar_plot.png')
-#
-#    plt.figure()
-#    shap.summary_plot(shap_values, features=x_test, feature_names=df.columns[2:], show=False)
-#    plt.tight_layout()
-#    plt.savefig('shap_dot_plot.png')
+    # epistemic and aleatoric uncertainties vs difference between target and prediction
+    fig, ax = plt.subplots()
+    ax.scatter(np.abs(target-pred), sigma_al)
+    ax.set_ylabel(r'$\sigma_{al}$')
+    ax.set_xlabel('|Note cible - Note prédite|')
+    fig.savefig('sigma_al_diff_scatter.png')
 
+    fig, ax = plt.subplots()
+    ax.scatter(np.abs(target-pred), sigma_ep)
+    ax.set_ylabel(r'$\sigma_{ep}$')
+    ax.set_xlabel('|Note cible - Note prédite|')
+    fig.savefig('sigma_ep_diff_scatter.png')
+    
+    # predicted probability distribution for each test data point
+    sorted_arg = np.argsort(target)
+    target_sorted = target[sorted_arg]
+    pred_sorted = pred[sorted_arg]
+    prob_dist = prob_dist[sorted_arg]
 
+    fig, ax = plt.subplots(figsize=(prob_dist.shape[0]*0.5, 12))
+    c = ax.pcolor(prob_dist.T/prob_dist.sum(axis=1), cmap='Greens')
+    ax.set_ylabel(r'Note', fontsize=15)
+    ax.get_xaxis().set_visible(False)
+    ax.scatter((np.linspace(1,len(target),len(target))-0.5), target_sorted*4, color='black', label='Note Cible')
+    ax.scatter((np.linspace(1,len(target),len(target))-0.5), pred_sorted*4, color='red', label='Note Prédite')
+    ticks = np.linspace(0, 40, 11)
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(ticks*10/ticks[-1], fontsize=15)
+    ax.legend()
+    fig.colorbar(c)
+    fig.set_tight_layout(True)
+    fig.savefig('prob_dist.png')
+
+    # epistemic uncertainty vs training data density
+    # use pca to reduce input space to 3 dimensions, and get binned data density
+    pca = PCA()
+    pca.fit(x_train)
+    x_train_pca = pca.transform(x_train)
+    hist3d_train, edges = np.histogramdd(x_train_pca[:,:2], bins=5)
+    hist3d_train = hist3d_train / hist3d_train.sum()
+    # find to which bin the test data point belong
+    x_test_pca = pca.transform(x_test)
+    stat, edges, binnumber = binned_statistic_dd(x_test_pca[:,:2], None, 'count', bins=5, expand_binnumbers=True)
+    binnumber = binnumber - 1 # let index start at 0, not 1
+    density = hist3d_train[tuple(binnumber)] # get density corresponding to test data points
+
+    fig, ax = plt.subplots()
+    ax.scatter(density, sigma_ep)
+    ax.set_ylabel(r'$\sigma_{ep}$')
+    ax.set_xlabel('Training data density')
+    fig.savefig('sigma_ep_density_scatter.png')
+
+    
+    
 
     
 if __name__ == '__main__':
