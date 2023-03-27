@@ -88,13 +88,17 @@ def plot_precision_recall(results, dthr, score_thresholds, outpath, classes_comp
 
         axp.plot(score_thresholds, precision_list, label=class_name)
         axr.plot(score_thresholds, recall_list, label=class_name)
-        axpr.plot(recall_list, precision_list, label=class_name, marker='o')
+        p = axpr.plot(recall_list, precision_list, label=class_name, marker='o')
+        col = p[-1].get_color()
+        for x, y, sthr in zip(recall_list, precision_list, score_thresholds):
+            plt.text(x, y, f'{sthr:.1f}', color=col)
 
     axp.legend()
     fig_precision.savefig(f'{outpath}/precision_{int(dthr)}m.png') # AI as reference
     axr.legend()
     fig_recall.savefig(f'{outpath}/recall_{int(dthr)}m.png') # AI as reference
     axpr.legend()
+    fig_precision_recall.set_tight_layout(True)
     fig_precision_recall.savefig(f'{outpath}/precision_recall_{int(dthr)}m.png') # AI as reference
     plt.close('all')
                 
@@ -112,7 +116,7 @@ def main(args):
     if args.type=='seg': # not controlling scores for segmentation
         thrs = [0.]
     else:
-        thrs = np.linspace(0.3, 0.8, 6)
+        thrs = np.arange(0.1,0.9,0.1)
 
     # no input video given, treat all predefined videos and combine results
     if args.inputvideo is None:
@@ -226,9 +230,13 @@ def main(args):
             args.csv = args.inputvideo.replace('mp4', 'csv')
 
         if args.json is None:
+            # load dicts to link predefined videos and their videocoding files
+            videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
+            json_dict = videocoding_config['json_dict']
+
             video_name = args.inputvideo.split('/')[-1]
             video_path = '/'.join(args.inputvideo.split('/')[:-1])
-            args.json = video_path+'/'+comp_videos[video_name]
+            args.json = video_path+'/'+json_dict[video_name]
 
         length_AI, length_AI_score, length_video, extract_path = extract_lengths(
             args.json, args.inputvideo, args.csv,
