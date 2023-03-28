@@ -2,45 +2,45 @@
 
     // dict to link classes from videocoding and AI to classes used for comparison
     classes_vid : {
-	'Affaissement de rive G significatif' : '',
-	'Affaissement de rive G grave' : '',
+	'Affaissement de rive significatif' : '',
+	'Affaissement de rive grave' : '',
 	
-	'Affaissement hors rive G significatif' : '',
-	'Affaissement hors rive G grave' : '',
+	'Affaissement hors rive significatif' : '',
+	'Affaissement hors rive grave' : '',
 	
-	'Ornierage G significatif' : '',
-	'Ornierage G grave' : '',
+	'Ornierage significatif' : '',
+	'Ornierage grave' : '',
 	
-	'Arrachement G significatif' : 'Arrachement_pelade',
-	'Arrachement G grave' : 'Arrachement_pelade',
+	'Arrachement significatif' : 'Arrachement_pelade',
+	'Arrachement grave' : 'Arrachement_pelade',
 	
-	'Faiencage G significatif non BDR' : 'Faiencage',
-	'Faiencage G grave non BDR' : 'Faiencage',
-	'Faiencage G specifique BDR' : 'Faiencage',
+	'Faiencage significatif non BDR' : 'Faiencage',
+	'Faiencage grave non BDR' : 'Faiencage',
+	'Faiencage specifique BDR' : 'Faiencage',
 	
-	'Fissure longitudinale BDR G reparee' : 'Pontage',
-	'Fissure longitudinale BDR G significative' : 'Longitudinale',
-	'Fissure longitudinale BDR G grave' : 'Longitudinale',
+	'Fissure longitudinale BDR reparee' : 'Pontage',
+	'Fissure longitudinale BDR significative' : 'Longitudinale',
+	'Fissure longitudinale BDR grave' : 'Longitudinale',
 	
-	'Fissure longitudinale HBDR G reparee' : 'Pontage',
-	'Fissure longitudinale HBDR G significative' : 'Longitudinale',
-	'Fissure longitudinale HBDR G grave' : 'Longitudinale',
+	'Fissure longitudinale HBDR reparee' : 'Pontage',
+	'Fissure longitudinale HBDR significative' : 'Longitudinale',
+	'Fissure longitudinale HBDR grave' : 'Longitudinale',
 	
-	'Fissure transversale G reparee' : 'Pontage',
-	'Fissure transversale G significative' : 'Transversale',
-	'Fissure transversale G grave' : 'Transversale',
+	'Fissure transversale reparee' : 'Pontage',
+	'Fissure transversale significative' : 'Transversale',
+	'Fissure transversale grave' : 'Transversale',
 	
-	'Nid de poule G significatif' : 'Nid_de_poule',
-	'Nid de poule G grave' : 'Nid_de_poule',
+	'Nid de poule significatif' : 'Nid_de_poule',
+	'Nid de poule grave' : 'Nid_de_poule',
 	
-	'Ressuage - Glacage G localise' : '',
-	'Ressuage - Glacage G generalise' : '',
+	'Ressuage - Glacage localise' : '',
+	'Ressuage - Glacage generalise' : '',
 	
-	'Reparation en BB sur decoupe G Petite largeur' : 'Remblaiement_de_tranchees',
-	'Reparation en BB sur decoupe G Pleine largeur' : 'Remblaiement_de_tranchees',
+	'Reparation en BB sur decoupe Petite largeur' : 'Remblaiement_de_tranchees',
+	'Reparation en BB sur decoupe Pleine largeur' : 'Remblaiement_de_tranchees',
 	
-	'Autre reparation G Petite largeur' : 'Autre_reparation',
-	'Autre reparation G Pleine largeur' : 'Autre_reparation'
+	'Autre reparation Petite largeur' : 'Autre_reparation',
+	'Autre reparation Pleine largeur' : 'Autre_reparation'
     }
     
     classes_AI : {
