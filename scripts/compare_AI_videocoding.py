@@ -12,7 +12,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import extract_lengths, compute_smallest_distances
+from utils import extract_lengths_videocoding, extract_lengths_AI, compute_smallest_distances
 
 
 def compute_average_precision(distances_AI, score, threshold):
@@ -135,9 +135,12 @@ def main(args):
         # get length for videocoding and predictions from all videos
         for vid, jjson in json_dict.items():
             print(f'\n{vid}')
-            length_AI, length_AI_score, length_video, extract_path = extract_lengths(
-                f'{inputpath}/{jjson}', f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}',
-                classes_vid, classes_AI, classes_comp,
+            length_video = extract_lengths_videocoding(
+                f'{inputpath}/{jjson}', f'{inputpath}/{vid.replace("mp4", "csv")}',
+                classes_vid, classes_comp, args.process_every_nth_meter
+            )
+            length_AI, length_AI_score, extract_path = extract_lengths_AI(
+                f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}', classes_AI, classes_comp,
                 args.type, args.config, args.checkpoint, args.process_every_nth_meter, filter_road=args.filter_road
             )
 
@@ -238,11 +241,14 @@ def main(args):
             video_path = '/'.join(args.inputvideo.split('/')[:-1])
             args.json = video_path+'/'+json_dict[video_name]
 
-        length_AI, length_AI_score, length_video, extract_path = extract_lengths(
+        length_video = extract_lengths_videocoding(
             args.json, args.inputvideo, args.csv,
-            classes_vid, classes_AI, classes_comp,
-            args.type, args.config, args.checkpoint, args.process_every_nth_meter, filter_road=args.filter_road
+            classes_vid, classes_comp, args.process_every_nth_meter
         )
+        length_AI, length_AI_score, extract_path = extract_lengths_AI(
+            args.inputvideo, args.csv, classes_AI, classes_comp,
+            args.type, args.config, args.checkpoint, args.process_every_nth_meter, filter_road=args.filter_road
+            )
 
         # loop over classes
         for ic, (lai, score, lv) in enumerate(zip(length_AI, length_AI_score, length_video)):

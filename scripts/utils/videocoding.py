@@ -213,13 +213,10 @@ def compute_smallest_distances(length_1, length_2):
 
 
 
-def extract_lengths(jsonpath, videopath, geoptis_csvpath,
-                    classes_vid, classes_AI, classes_comp,
-                    ai_type, ai_config, ai_checkpoint, process_every_nth_meter, filter_road=False, device='cuda:0'):
+def extract_lengths_videocoding(jsonpath, videopath, geoptis_csvpath,
+                                classes_vid, classes_comp, process_every_nth_meter):
     '''
-    Extract a frame of the video every n meter.
-    Run inference on extracted images with pretrained model.
-    Return length from start of mission for videocding and predictions.
+    Return length of videocoded degradations from start of mission.
     '''
     classes, degradations, timestamps = parse_videocoding(jsonpath)
 
@@ -244,8 +241,6 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
     framerate = cam.get(cv.CAP_PROP_FPS)
 
     # length list for each AI class
-    length_AI = [[] for _ in range(len(classes_comp))]
-    length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
     length_video = [[] for _ in range(len(classes_comp))]
 
     # loop over videocoding annotations --> extract lengths
@@ -284,6 +279,25 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                 for d in dist_array:
                     length_video[idx].append(d)
 
+    return length_video
+
+
+
+
+def extract_lengths_AI(videopath, geoptis_csvpath, classes_AI, classes_comp, ai_type, ai_config,
+                      ai_checkpoint, process_every_nth_meter, filter_road=False, device='cuda:0'):
+    '''
+    Extract a frame of the video every n meter.
+    Run inference on extracted images with pretrained model.
+    Return length of detected degradations from start of mission.
+    '''
+    traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
+
+    # length list for each AI class
+    length_AI = [[] for _ in range(len(classes_comp))]
+    length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
+
+    cam = cv.VideoCapture(videopath)
     vid_name = videopath.split('/')[-1].replace(".mp4","")
     extract_path = f'prepare_annotations/processed_videos/{vid_name}/{process_every_nth_meter}'
     
@@ -339,10 +353,6 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                 cv.imwrite(f'{extract_path}/{im_name}', frame)
 
         extracted_frames = glob.glob(f'{extract_path}/*.jpg')
-
-                
-#    ann_path = f'{extract_path}/det_inference_thr_03/'
-#    os.makedirs(ann_path, exist_ok=True)
 
     # load model
     if ai_type == 'cls':
@@ -401,17 +411,6 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                         length_AI[idx].append(d)
                         length_AI_score[idx].append(c[:,4].max()) # take highest score if several instances of same class
 
-#                for ip, p in enumerate(c): # loop on bboxes
-#                    x1, y1, x2, y2 = p[:4]
-#                    x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-#                    if p[4] > 0.3:
-#                        ann.append(f'{ic} {(x1+x2)/2/image_width} {(y1+y2)/2/image_height} {(x2-x1)/image_width} {(y2-y1)/image_height}')
-#                        
-#            ann_name = fname.replace('.jpg', '.txt').replace(extract_path, ann_path)
-#            with open(ann_name, 'w') as f:
-#                for a in ann:
-#                    f.write(f'{a}\n')
-
         elif ai_type == 'seg':
             res = mmseg.apis.inference_segmentor(model, frame)[0]
             unique_ic, unique_count = np.unique(res, return_counts=True)
@@ -429,4 +428,4 @@ def extract_lengths(jsonpath, videopath, geoptis_csvpath,
                     length_AI_score[idx].append(1) # dummy score
 
 
-    return length_AI, length_AI_score, length_video, extract_path
+    return length_AI, length_AI_score, extract_path
