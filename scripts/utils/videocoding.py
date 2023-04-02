@@ -213,7 +213,7 @@ def compute_smallest_distances(length_1, length_2):
 
 
 
-def extract_lengths_videocoding(jsonpath, videopath, geoptis_csvpath,
+def extract_lengths_videocoding(jsonpath, geoptis_csvpath,
                                 classes_vid, classes_comp, process_every_nth_meter):
     '''
     Return length of videocoded degradations from start of mission.
@@ -236,9 +236,6 @@ def extract_lengths_videocoding(jsonpath, videopath, geoptis_csvpath,
     traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
     classname_to_deg_index = {name: i for i, name in enumerate(classes)}
     deg_index_to_classname = {i: name for name, i in classname_to_deg_index.items()}
-
-    cam = cv.VideoCapture(videopath)
-    framerate = cam.get(cv.CAP_PROP_FPS)
 
     # length list for each AI class
     length_video = [[] for _ in range(len(classes_comp))]

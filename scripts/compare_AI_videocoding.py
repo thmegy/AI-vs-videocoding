@@ -124,10 +124,6 @@ def main(args):
         json_dict_list = [ videocoding_config['json_dict_gaetan'], videocoding_config['json_dict_leo'], videocoding_config['json_dict_nestor'] ]
         inputpath = videocoding_config['inputpath']
         
-        outpath = f'results_comparison/{args.type}/'
-        os.makedirs(outpath, exist_ok=True)
-        
-
         # get length for videocoding (for all videocoders) and predictions from all videos
         length_AI_list = []
         length_AI_score_list = []
@@ -147,7 +143,7 @@ def main(args):
             for vid in json_dict.keys():
                 jfile = json_dict[vid]
                 length_video = extract_lengths_videocoding(
-                    f'{inputpath}/{jfile}', f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}',
+                    f'{inputpath}/{jfile}', f'{inputpath}/{vid.replace("mp4", "csv")}',
                     classes_vid, classes_comp, args.process_every_nth_meter
                 )
 
@@ -231,10 +227,7 @@ def main(args):
 
             
     # treat a single video
-    else:
-        outpath = f'results_comparison/{args.type}/{args.inputvideo.split("/")[-1].replace(".mp4", "")}'
-        os.makedirs(outpath, exist_ok=True)
-            
+    else:            
         if args.csv is None:
             args.csv = args.inputvideo.replace('mp4', 'csv')
         
@@ -265,8 +258,8 @@ def main(args):
             os.makedirs(outpath, exist_ok=True)
         
             length_video = extract_lengths_videocoding(
-                jfile, args.inputvideo, args.csv,
-                classes_vid, classes_comp, args.process_every_nth_meter
+                jfile, args.csv, classes_vid,
+                classes_comp, args.process_every_nth_meter
             )
 
             # loop over classes
@@ -323,6 +316,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--videocoders', nargs=3, type=str, default=['Gaetan', 'Leo', 'Nestor'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     
     # args for single videos
     parser.add_argument('--inputvideo')
@@ -337,7 +331,6 @@ if __name__ == '__main__':
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     
-    parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     parser.add_argument('--threshold-dist', type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
 
