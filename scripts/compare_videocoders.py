@@ -14,73 +14,6 @@ import matplotlib.pyplot as plt
 from utils import extract_lengths_videocoding
 
 
-# dict with pre-defined videos and their corresponding csv and json
-inputpath = 'data/reference_videos/'
-#comp_videos_1 = {
-#    'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_DEGRADATION_IA_20220513_075518_PC-GAETAN_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
-#    'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'releve_lot_DEGRADATION_IA_20220513_080725_PC-GAETAN_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
-#    'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'releve_lot_DEGRADATION_IA_20220516_080820_PC-GAETAN_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
-#    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_DEGRADATION_IA_20220516_081017_PC-GAETAN_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-#    'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'releve_lot_DEGRADATION_IA_20220516_081508_PC-GAETAN_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
-#    'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'releve_lot_DEGRADATION_IA_20220516_082201_PC-GAETAN_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
-#    'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_DEGRADATION_IA_20220516_083956_PC-GAETAN_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
-#    'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'releve_lot_DEGRADATION_IA_20220516_085227_PC-GAETAN_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
-#    'Douarnenez_AV_Logiroad_AV_20220317_172419_603.mp4' : 'releve_lot_DEGRADATION_IA_20220516_085819_PC-GAETAN_AV_Douarnenez_AV_Logiroad_AV_20220317_172419_603.json',
-##    'no_contract_CD 33_20210309_101639_889.mp4' : 'releve_lot_DEGRADATION_IA_20220516_091622_PC-GAETAN_AV_no_contract_CD_33_20210309_101639_889.json',
-#    'no_contract_CD 33_20210311_111829_045.mp4' : 'releve_lot_DEGRADATION_IA_20220516_093808_PC-GAETAN_AV_no_contract_CD_33_20210311_111829_045.json',
-#    'no_contract_CD 33_20210420_164326_010.mp4' : 'releve_lot_DEGRADATION_IA_20220516_100415_PC-GAETAN_AV_no_contract_CD_33_20210420_164326_010.json',
-#    'Vannes_logiroad_2_20220124_094528_789.mp4' : 'releve_lot_DEGRADATION_IA_20220516_101245_PC-GAETAN_AV_Vannes_logiroad_2_20220124_094528_789.json',
-#    'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_DEGRADATION_IA_20220516_101835_PC-GAETAN_AV_Vannes_logiroad_2_20220124_165314_007.json',
-#}
-
-comp_videos_1 = {
-    'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_IA_20220509_095322_MSI-LEO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
-    'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'releve_lot_IA_20220510_083631_MSI-LEO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
-    'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'releve_lot_IA_20220510_090913_MSI-LEO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
-    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_IA_20220510_091349_MSI-LEO_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-    'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'releve_lot_IA_20220510_091814_MSI-LEO_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
-    'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'releve_lot_IA_20220510_092425_MSI-LEO_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
-    'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_IA_20220510_104854_MSI-LEO_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
-    'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'releve_lot_IA_20220510_112359_MSI-LEO_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
-    'Douarnenez_AV_Logiroad_AV_20220317_172419_603.mp4' : 'releve_lot_IA_20220510_113342_MSI-LEO_AV_Douarnenez_AV_Logiroad_AV_20220317_172419_603.json',
-#    'no_contract_CD 33_20210309_101639_889.mp4' : 'releve_lot_IA_20220510_094310_MSI-LEO_AV_no_contract_CD_33_20210309_101639_889.json',
-    'no_contract_CD 33_20210311_111829_045.mp4' : 'releve_lot_IA_20220510_100500_MSI-LEO_AV_no_contract_CD_33_20210311_111829_045.json',
-    'no_contract_CD 33_20210420_164326_010.mp4' : 'releve_lot_IA_20220510_102610_MSI-LEO_AV_no_contract_CD_33_20210420_164326_010.json',
-    'Vannes_logiroad_2_20220124_094528_789.mp4' : 'releve_lot_IA_20220510_161404_MSI-LEO_AV_Vannes_logiroad_2_20220124_094528_789.json',
-#    'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_IA_20220510_173127_MSI-LEO_AV_Vannes_logiroad_2_20220124_165314_007.json',
-    'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_IA_20220516_085556_MSI-LEO_AV_Vannes_logiroad_2_20220124_165314_007.json',
-}
-
-# Nestor
-comp_videos_2 = {
-    'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_Comparaison_IA_20220606_101729_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
-#    'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_Comparaison_IA_20220606_135312_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
-    'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'releve_lot_Comparaison_IA_20220608_154238_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
-    'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'releve_lot_Comparaison_IA_20220611_132026_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
-    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Comparaison_IA_20220523_153632_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-#    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Comparaison_IA_20220524_084808_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-#    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Comparaison_IA_20220601_162221_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-#    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Comparaison_IA_20220603_105427_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-#    'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Comparaison_IA_20220606_135553_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
-    'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'releve_lot_Comparaison_IA_20220523_230624_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
-#    'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'releve_lot_Comparaison_IA_20220606_124838_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
-    'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'releve_lot_Comparaison_IA_20220523_094116_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
-#    'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'releve_lot_Comparaison_IA_20220606_141658_LAPTOP-HO492LF6_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
-    'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_Comparaison_IA_20220530_204909_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
-#    'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_Comparaison_IA_20220601_161803_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
-#    'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_Comparaison_IA_20220603_105843_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
-    'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'releve_lot_Comparaison_IA_20220611_212617_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
-#    'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'releve_lot_Comparaison_IA_20220611_234222_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
-    'Douarnenez_AV_Logiroad_AV_20220317_172419_603.mp4' : 'releve_lot_Comparaison_IA_20220523_161056_LAPTOP-HO492LF6_AV_Douarnenez_AV_Logiroad_AV_20220317_172419_603.json',
-#    'no_contract_CD 33_20210309_101639_889.mp4' : '',
-    'no_contract_CD 33_20210311_111829_045.mp4' : 'releve_lot_Comparaison_IA_20220611_231623_LAPTOP-HO492LF6_AV_no_contract_CD_33_20210311_111829_045.json',
-    'no_contract_CD 33_20210420_164326_010.mp4' : 'releve_lot_Comparaison_IA_20220601_130547_LAPTOP-HO492LF6_AV_no_contract_CD_33_20210420_164326_010.json',
-    'Vannes_logiroad_2_20220124_094528_789.mp4' : 'releve_lot_Comparaison_IA_20220610_155307_LAPTOP-HO492LF6_AV_Vannes_logiroad_2_20220124_094528_789.json',
-    'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_Comparaison_IA_20220610_124821_LAPTOP-HO492LF6_AV_Vannes_logiroad_2_20220124_165314_007.json',
-}
-
-
-
 
 def compute_smallest_distances(length_1, length_2):
     # compute smallest distance for each element of length_1 wrt length_2 (arrays or lists)
@@ -198,19 +131,19 @@ def main(args):
 
         # loop over the other videocoders
         for length_video_list_other, videocoder_other in zip(length_video_list_videocoders_tmp, videocoders_tmp):
-    
-            results = {'recall':{}, 'precision':{}}
-            
+            print(f'\n\n{videocoder_ref}_vs_{videocoder_other}\n')
             outpath = f'results_comparison/videocoders/{videocoder_ref}_vs_{videocoder_other}'
             os.makedirs(outpath, exist_ok=True)
-        
-
+    
+            results = {'recall':{}, 'precision':{}, 'f1_score':{}}
+                   
             # compute distances for all classes          
             # loop over classes
             for ic in range(len(classes_comp)):
                 class_name = list(classes_comp.keys())[ic]
                 results['recall'][class_name] = {}
                 results['precision'][class_name] = {}
+                results['f1_score'][class_name] = {}
         
                 distances_video_list_ref = []
                 distances_video_list_other = []
@@ -233,14 +166,19 @@ def main(args):
                 # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches wit several predictions...
                 recall_dict = {}
                 precision_dict = {}
+                f1_dict = {}
                 for dthr in args.threshold:
                     precision, recall = compute_precision_recall(distances_video_other, distances_video_ref, dthr)
                     recall_dict[f'{int(dthr)}m'] = recall
                     precision_dict[f'{int(dthr)}m'] = precision
+                    f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
 
                 results['recall'][class_name] = recall_dict
                 results['precision'][class_name] = precision_dict
+                results['f1_score'][class_name] = f1_dict
 
+                distance_thr = '10m' # threshold used to extract single summary figures
+                print(f'{class_name} {results["f1_score"][class_name][distance_thr]:.3f}')
 
                 plot_evolution(results, 'precision', 'Precision', outpath)
                 plot_evolution(results, 'recall', 'Recall', outpath)
