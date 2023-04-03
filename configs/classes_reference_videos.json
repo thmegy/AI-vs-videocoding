@@ -86,5 +86,18 @@
     }
 
 
+    // score thresholds used for single summary figures
+    score_thresholds : {
+	'Arrachement_pelade' : '0.3',
+	'Faiencage' : '0.4',
+	'Nid_de_poule' : '0.5',
+	'Transversale' : '0.3',
+	'Longitudinale' : '0.4',
+	'Remblaiement_de_tranchees' : '0.2',
+	'Autre_reparation' : '0.2',
+	'Pontage' : '0.4',
+    }
+    
+
 
 }
