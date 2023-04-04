@@ -149,6 +149,28 @@ def MDNLoss(loc, scale, mixing, target):
     return loss
 
 
+
+def plot_scatter_2Dhist(title, array_x, xlabel, array_y, ylabel, range_hist):
+    # scatter plot
+    fig, ax = plt.subplots()
+    ax.scatter(array_x, array_y)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    fig.savefig(f'{title}_scatter.png')
+
+    # 2d histogram plot
+    matrix, _, _ = np.histogram2d(array_y, array_x, range=range_hist)
+    matrix = matrix / matrix.sum(axis=0)
+
+    fig, ax = plt.subplots()
+    c = ax.pcolor(matrix, cmap='Greens')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.yaxis.set_ticks(np.linspace(0, 10, 6))
+    ax.set_yticklabels([f'{l:.2f}' for l in np.linspace(0, range_hist[0][1], 6)], rotation=45, ha='right')   
+    fig.colorbar(c)
+    fig.savefig(f'{title}_2Dhist.png')
+
     
 
 
@@ -251,7 +273,7 @@ def main(args):
     ax.set_ylabel('Note Prédite')
     ax.set_xlabel('Note cible')
     fig.colorbar(c)
-    fig.savefig('pred_target_2d.png')
+    fig.savefig('pred_target_2DHist.png')
     
     fig, ax = plt.subplots()
     ax.errorbar(target, pred, yerr=sigma_tot, fmt='none', color='red', label=r'$\sqrt{\sigma_{ep}^{2}+\sigma_{al}^{2}}$')
@@ -264,36 +286,13 @@ def main(args):
     fig.savefig('pred_target_scatter.png', dpi=200)
 
     # epistemic and aleatoric uncertainties vs target
-    fig, ax = plt.subplots()
-    ax.scatter(target, sigma_al)
-    ax.set_ylabel(r'$\sigma_{al}$')
-    ax.set_xlabel('Note cible')
-    fig.savefig('sigma_al_target_scatter.png')
-
-    fig, ax = plt.subplots()
-    ax.scatter(target, sigma_ep)
-    ax.set_ylabel(r'$\sigma_{ep}$')
-    ax.set_xlabel('Note cible')
-    fig.savefig('sigma_ep_target_scatter.png')
-
-    # epistemic and aleatoric uncertainties vs difference between target and prediction
-    fig, ax = plt.subplots()
-    ax.scatter(np.abs(target-pred), sigma_al)
-    ax.set_ylabel(r'$\sigma_{al}$')
-    ax.set_xlabel('|Note cible - Note prédite|')
-    fig.savefig('sigma_al_diff_scatter.png')
-
-    fig, ax = plt.subplots()
-    ax.scatter(np.abs(target-pred), sigma_ep)
-    ax.set_ylabel(r'$\sigma_{ep}$')
-    ax.set_xlabel('|Note cible - Note prédite|')
-    fig.savefig('sigma_ep_diff_scatter.png')
+    plot_scatter_2Dhist('sigma_al_target', target, 'Note cible', sigma_al, r'$\sigma_{al}$', [[0, sigma_al.max()],[0, 10]])
+    plot_scatter_2Dhist('sigma_ep_target', target, 'Note cible', sigma_ep, r'$\sigma_{ep}$', [[0, sigma_ep.max()],[0, 10]])
     
-    fig, ax = plt.subplots()
-    ax.scatter(np.abs(target-pred), sigma_tot)
-    ax.set_ylabel(r'$\sigma_{tot}$')
-    ax.set_xlabel('|Note cible - Note prédite|')
-    fig.savefig('sigma_tot_diff_scatter.png')
+    # epistemic and aleatoric uncertainties vs difference between target and prediction
+    plot_scatter_2Dhist('sigma_al_diff', np.abs(target-pred), '|Note cible - Note prédite|', sigma_al, r'$\sigma_{al}$', [[0, sigma_al.max()],[0, np.abs(target-pred).max()]])
+    plot_scatter_2Dhist('sigma_ep_diff', np.abs(target-pred), '|Note cible - Note prédite|', sigma_ep, r'$\sigma_{ep}$', [[0, sigma_ep.max()],[0, np.abs(target-pred).max()]])
+    plot_scatter_2Dhist('sigma_tot_diff', np.abs(target-pred), '|Note cible - Note prédite|', sigma_tot, r'$\sigma_{tot}$', [[0, sigma_tot.max()],[0, np.abs(target-pred).max()]])
     
     # predicted probability distribution for each test data point
     sorted_arg = np.argsort(target)
