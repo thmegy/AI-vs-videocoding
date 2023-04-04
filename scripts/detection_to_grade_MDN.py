@@ -111,7 +111,7 @@ class GradeFC(nn.Module):
         
         output = self.fcout(x)
         output = output.reshape(x.shape[0], self.ncomp, 3) # rows are MDN components, columns are parameters of components (mu, sigma, pi)
-        loc = torch.sigmoid(output[:,:,0]) * 10
+        #loc = torch.sigmoid(output[:,:,0]) * 10
         loc = torch.exp(output[:,:,0])
         
         sigma_max = 10 # arbitrary parameter
@@ -288,6 +288,12 @@ def main(args):
     ax.set_ylabel(r'$\sigma_{ep}$')
     ax.set_xlabel('|Note cible - Note prédite|')
     fig.savefig('sigma_ep_diff_scatter.png')
+    
+    fig, ax = plt.subplots()
+    ax.scatter(np.abs(target-pred), sigma_tot)
+    ax.set_ylabel(r'$\sigma_{tot}$')
+    ax.set_xlabel('|Note cible - Note prédite|')
+    fig.savefig('sigma_tot_diff_scatter.png')
     
     # predicted probability distribution for each test data point
     sorted_arg = np.argsort(target)
