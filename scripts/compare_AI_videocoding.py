@@ -35,6 +35,63 @@ def compute_average_precision(distances_AI, score, threshold):
     return ap
 
 
+def compute_average_recall(length_AI, AI_score, length_vid, threshold_dist, process_every_nth_meter):
+    def compute_distances(length_vid, length_AI, AI_score, N_ai):
+        # compute distances for each element of length_vid wrt length_AI (arrays or lists)
+        distance_list = []
+        score_list = []
+        for l1 in length_vid:
+            if len(length_AI) > 0:
+                dist = np.abs(l1 - np.array(length_AI))
+                if len(length_AI) >= N_ai:
+                    sorted_inds = np.argsort(dist) # sort by distance
+                    dist = dist[sorted_inds]
+                    dist = dist[:N_ai]
+
+                    score = AI_score[sorted_inds]
+                    score = score[:N_ai]
+                else:
+                    dist_tmp = 50 * np.ones(N_ai)
+                    dist_tmp[:len(dist)] = dist
+                    dist = dist_tmp
+
+                    score = np.zeros(N_ai)
+                    score[:len(dist)] = AI_score
+            else:
+                dist = 50 * np.ones(N_ai)
+                score = np.zeros(N_ai)
+                
+            distance_list.append(dist)
+            score_list.append(score)
+        return np.stack(distance_list), np.stack(score_list)
+
+    # number of detection to keep for average recall calculation =
+    # number of frames in interval given by +-
+    # the largest distance threshold considered (detections beyand are necessarily FN)
+    N_ai = 2 * (1 + threshold_dist // process_every_nth_meter)
+
+    # compute array containing distances and corresponding AI scores
+    if len(length_vid) > 0:
+        distance_array, score_array = compute_distances(length_vid, length_AI, AI_score, N_ai)
+    else:
+        return np.nan
+
+    # sort AI detection by scores
+    sort_score = np.sort(-AI_score)
+
+    # loop in score thresholds, at each iteration compute number of FN
+    recall_list = []
+    for score_thr in sort_score:
+        masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
+        distance_thresholded = np.where(masked_distance<threshold_dist, 1, 0) # replace distances below dist thr by 1, other by 0
+        TP_count = distance_thresholded.sum(axis=1) # count of AI detection within detection threshold of each annotated degradation
+        recall = (TP_count > 0).sum() / len(TP_count) # TP / (TP+FN)
+        recall_list.append(recall)
+
+    ar = sum(recall_list) / len(recall_list)
+    return ar
+
+        
 
 def compute_precision_recall(distances_AI, distances_video, threshold):
     tp_ai = (distances_AI < threshold).sum()
@@ -297,6 +354,8 @@ def main(args):
                         for dthr in args.threshold_dist:
                             ap = compute_average_precision(distances_AI_full, score, dthr)
                             ap_dict[f'{int(dthr)}m'] = ap
+                            ar = compute_average_recall(lai, score, lv, dthr, args.process_every_nth_meter)
+                            print(class_name, dthr, ar)
                         results['ap'][class_name] = ap_dict
 
 
