@@ -11,16 +11,16 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import extract_lengths_videocoding, extract_lengths_AI, compute_smallest_distances
+from utils import extract_lengths_videocoding, extract_lengths_AI, compute_smallest_distances, compute_distances
 
 
-def compute_average_precision(distances_AI, score, threshold):
+def compute_average_precision(distances_AI, score, threshold_dist):
     # sort examples
     sort_inds = np.argsort(-score)
     sort_dist = distances_AI[sort_inds]
     
     # count true positive examples
-    pos_inds = sort_dist < threshold
+    pos_inds = sort_dist < threshold_dist
     tp = np.cumsum(pos_inds)
     total_pos = tp[-1]
     
@@ -35,49 +35,12 @@ def compute_average_precision(distances_AI, score, threshold):
     return ap
 
 
-def compute_average_recall(length_AI, AI_score, length_vid, threshold_dist, process_every_nth_meter):
-    def compute_distances(length_vid, length_AI, AI_score, N_ai):
-        # compute distances for each element of length_vid wrt length_AI (arrays or lists)
-        distance_list = []
-        score_list = []
-        for l1 in length_vid:
-            if len(length_AI) > 0:
-                dist = np.abs(l1 - np.array(length_AI))
-                if len(length_AI) >= N_ai:
-                    sorted_inds = np.argsort(dist) # sort by distance
-                    dist = dist[sorted_inds]
-                    dist = dist[:N_ai]
-
-                    score = AI_score[sorted_inds]
-                    score = score[:N_ai]
-                else:
-                    dist_tmp = 50 * np.ones(N_ai)
-                    dist_tmp[:len(dist)] = dist
-                    dist = dist_tmp
-
-                    score = np.zeros(N_ai)
-                    score[:len(dist)] = AI_score
-            else:
-                dist = 50 * np.ones(N_ai)
-                score = np.zeros(N_ai)
-                
-            distance_list.append(dist)
-            score_list.append(score)
-        return np.stack(distance_list), np.stack(score_list)
-
-    # number of detection to keep for average recall calculation =
-    # number of frames in interval given by +-
-    # the largest distance threshold considered (detections beyand are necessarily FN)
-    N_ai = 2 * (1 + threshold_dist // process_every_nth_meter)
-
-    # compute array containing distances and corresponding AI scores
-    if len(length_vid) > 0:
-        distance_array, score_array = compute_distances(length_vid, length_AI, AI_score, N_ai)
-    else:
+def compute_average_recall(distance_array, score_array, threshold_dist):
+    if len(distance_array) == 0:
         return np.nan
 
     # sort AI detection by scores
-    sort_score = np.sort(-AI_score)
+    sort_score = np.sort(-score_array)
 
     # loop in score thresholds, at each iteration compute number of FN
     recall_list = []
@@ -189,11 +152,16 @@ def main(args):
     classes_AI = cls_config['classes_AI']
     classes_comp= cls_config['classes_comp']
         
-    results = {'recall':{}, 'precision':{}, 'f1_score':{}, 'ap':{}}
+    results = {'recall':{}, 'precision':{}, 'f1_score':{}, 'ap':{}, 'ar':{}}
     if args.type=='seg': # not controlling scores for segmentation
         thrs = [0.]
     else:
         thrs = np.arange(0.1,0.9,0.1)
+
+    # number of detection to keep for average recall calculation =
+    # number of frames in interval given by +-
+    # the largest distance threshold considered (detections beyand are necessarily FN)
+    N_ai = 2 * (1 + args.threshold_dist[-1] // args.process_every_nth_meter)
 
     # no input video given, treat all predefined videos and combine results
     if args.inputvideo is None:
@@ -249,8 +217,11 @@ def main(args):
                     distances_AI_list = [[] for _ in range(len(thrs))]
                     distances_video_list = [[] for _ in range(len(thrs))]
 
-                    distances_AI_full = [] # for AP
-                    score_full = [] # for AP
+                    distances_AI_full = [] # for AP, dim N_detection_AI
+                    score_full = [] # for AP, dim N_detection_AI
+                    
+                    distances_array_full = [] # for AR, dim (N_degradation_vid, N_ai)
+                    score_array_full = [] # for AR, dim (N_degradation_vid, N_ai)
 
                     # loop over videos
                     for length_AI, length_AI_score, length_video in zip(length_AI_list, length_AI_score_list, length_video_list):
@@ -260,7 +231,12 @@ def main(args):
 
                         distances_AI_full += compute_smallest_distances(lai, lv).tolist()
                         score_full += length_AI_score[ic]
-
+                        
+                        if len(lv) > 0 and len(lai) > 0:
+                            distances_array, score_array = compute_distances(lv, lai, score, N_ai) # for average recall
+                            distances_array_full.append(distances_array)
+                            score_array_full.append(score_array)
+                        
                         # loop over thresholds (0.3 -> 0.8)
                         for it, thr in enumerate(thrs):
                             lai_thr = lai[score > thr]  # apply threshold to length_AI
@@ -269,15 +245,27 @@ def main(args):
                             distances_video_list[it].append( compute_smallest_distances(lv, lai_thr) )
 
 
-                    ######## compute average precision ##########
+                    ######## compute average precision and average recall ##########
                     if args.type != 'seg':
                         distances_AI_full = np.array(distances_AI_full)
                         score_full = np.array(score_full)
+                        if len(distances_array_full) > 0 and len(score_array_full) > 0:
+                            distances_array_full = np.concatenate(distances_array_full)
+                            score_array_full = np.concatenate(score_array_full)
+                        else:
+                            distances_AI_array_full, score_array_full = np.array([]), np.array([])
+                        
                         ap_dict = {}
+                        ar_dict = {}
                         for dthr in args.threshold_dist:
                             ap = compute_average_precision(distances_AI_full, score_full, dthr)
                             ap_dict[f'{int(dthr)}m'] = ap
+
+                            ar = compute_average_recall(distances_array_full, score_array_full, dthr)
+                            ar_dict[f'{int(dthr)}m'] = ar
+                            
                         results['ap'][class_name] = ap_dict
+                        results['ar'][class_name] = ar_dict
 
 
                     # new loop over thresholds to compute precision and recall across all videos
@@ -350,13 +338,20 @@ def main(args):
                     ########## compute average precision
                     if args.type != 'seg':
                         distances_AI_full = compute_smallest_distances(lai, lv) # distances with no score threshold applied
+                        if len(lv) > 0 and len(lai) > 0:
+                            distances_AI_array_full, score_array_full = compute_distances(lv, lai, score, N_ai) # for average recall
+                        else:
+                            distances_AI_array_full, score_array_full = np.array([]), np.array([])
+                        
                         ap_dict = {}
+                        ar_dict = {}
                         for dthr in args.threshold_dist:
                             ap = compute_average_precision(distances_AI_full, score, dthr)
                             ap_dict[f'{int(dthr)}m'] = ap
-                            ar = compute_average_recall(lai, score, lv, dthr, args.process_every_nth_meter)
-                            print(class_name, dthr, ar)
+                            ar = compute_average_recall(distances_AI_array_full, score_array_full, dthr)
+                            ar_dict[f'{int(dthr)}m'] = ar
                         results['ap'][class_name] = ap_dict
+                        results['ar'][class_name] = ar_dict
 
 
                     # loop over thresholds

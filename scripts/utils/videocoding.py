@@ -212,6 +212,43 @@ def compute_smallest_distances(length_1, length_2):
 
 
 
+def compute_distances(length_vid, length_AI, AI_score, N_ai):
+    # compute distances for each element of length_vid wrt length_AI (arrays or lists)
+    # For each degradation in length_vid measure and return the N_ai smallest distances wrt to AI detections
+    # returns array of distances (N_degradation_vid, N_ai), and array of AI scores (same dimensions)
+    assert len(length_AI) == len(AI_score)
+    
+    distance_list = []
+    score_list = []
+    for l1 in length_vid:
+        if len(length_AI) > 0:
+            dist = np.abs(l1 - np.array(length_AI))
+            if len(length_AI) >= N_ai:
+                sorted_inds = np.argsort(dist) # sort by distance
+                dist = dist[sorted_inds]
+                dist = dist[:N_ai]
+
+                score = AI_score[sorted_inds]
+                score = score[:N_ai]
+            else:
+                dist_tmp = 50 * np.ones(N_ai)
+                dist_tmp[:len(dist)] = dist
+
+                score = np.zeros(N_ai)
+                score[:len(dist)] = AI_score
+                
+                dist = dist_tmp
+        else:
+            dist = 50 * np.ones(N_ai)
+            score = np.zeros(N_ai)
+
+        distance_list.append(dist)
+        score_list.append(score)
+    return np.stack(distance_list), np.stack(score_list)
+
+
+
+
 
 def extract_lengths_videocoding(jsonpath, geoptis_csvpath,
                                 classes_vid, classes_comp, process_every_nth_meter):
