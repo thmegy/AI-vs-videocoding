@@ -62,6 +62,9 @@ def plot_precision_recall(results, dthr, outpath):
     axf1.set_xlabel('score threshold')
     axf1.set_ylabel('F1-score')
 
+    max_f1_dict = {}
+    max_sthr_dict = {}
+    
     for cls, cls_dict in results.items():
         dthr_dict = cls_dict[dthr]
         
@@ -90,6 +93,9 @@ def plot_precision_recall(results, dthr, outpath):
         plt.text(xmax, 0, f'{xmax:.2f}', color=col, horizontalalignment='right', verticalalignment='top', rotation=45, fontsize='small')
         plt.text(0, ymax, f'{ymax:.2f}', color=col, horizontalalignment='right', verticalalignment='center', fontsize='small')
 
+        max_f1_dict[cls] = ymax
+        max_sthr_dict[cls] = xmax
+
     axpr.legend(bbox_to_anchor=(0.5, 1.2), loc='upper center', ncol=3, fontsize='small')
     figpr.set_tight_layout(True)
     figpr.savefig(f'{outpath}/precision_recall_{dthr}.png')
@@ -101,6 +107,8 @@ def plot_precision_recall(results, dthr, outpath):
     figf1.savefig(f'{outpath}/f1_score_{dthr}.png')
 
     plt.close('all')
+
+    return max_f1_dict, max_sthr_dict
                 
         
     
@@ -293,7 +301,6 @@ def main(args):
                     
     ######### post-processing ##############
     distance_thr = '10m' # threshold used to extract single summary figures
-    score_thrs = cls_config['score_thresholds']
 
     for videocoder in args.videocoders:
         print(f'\n\n{videocoder}\n')
@@ -302,11 +309,18 @@ def main(args):
             results = json.load(f)
 
         for dthr in args.threshold_dist:
-            plot_precision_recall(results, f'{int(dthr)}m', outpath)
+            max_f1_dict_tmp, max_sthr_dict_tmp = plot_precision_recall(results, f'{int(dthr)}m', outpath)
+            if f'{int(dthr)}m' == distance_thr:
+                max_f1_dict = max_f1_dict_tmp.copy()
+                max_sthr_dict = max_sthr_dict_tmp.copy()
 
-        print('class  AP  F1_score')
-#        for (cls, ap_dict), f1_dict in zip(results['ap'].items(), results['f1_score'].values()):
-#            print(cls, f'{ap_dict[distance_thr]:.3f}', f'{f1_dict[score_thrs[cls]][distance_thr]:.3f}')
+        print(f'{"class" : <30}{"score_thr": ^10}{"AP": ^10}{"AR": ^10}{"F1_score": ^10}')
+        for cls, cls_dict in results.items():
+            dthr_dict = cls_dict[distance_thr]
+            max_sthr = max_sthr_dict[cls]
+            max_f1 = max_f1_dict[cls]
+            print(f'{cls: <30}{max_sthr: ^10.2f}{dthr_dict["ap"]: ^10.3f}{dthr_dict["ar"]: ^10.3f}{max_f1: ^10.3f}')
+        
 
 
             
