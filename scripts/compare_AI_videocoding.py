@@ -27,119 +27,79 @@ def compute_average_precision(distances_AI, score, threshold_dist):
     # count not difficult examples
     pn_inds = sort_dist != -1
     pn = np.cumsum(pn_inds)
-    
+
     tp[np.logical_not(pos_inds)] = 0
     precision = tp / pn
     ap = np.sum(precision) / total_pos
 
-    return ap
+    return ap, precision[pos_inds], score[sort_inds][pos_inds], # AP, [precision_array], [score of true positives]
 
 
-def compute_average_recall(distance_array, score_array, threshold_dist):
-    if len(distance_array) == 0:
-        return np.nan
-
-    # sort AI detection by scores
-    sort_score = np.sort(-score_array)
+def compute_average_recall(distance_array, score_array, dist_thr, score_thrs):
+    if len(distance_array) == 0 or len(score_thrs) == 0:
+        return np.nan, []
 
     # loop in score thresholds, at each iteration compute number of FN
     recall_list = []
-    for score_thr in sort_score:
+    for score_thr in score_thrs:
         masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
-        distance_thresholded = np.where(masked_distance<threshold_dist, 1, 0) # replace distances below dist thr by 1, other by 0
+        distance_thresholded = np.where(masked_distance<dist_thr, 1, 0) # replace distances below dist thr by 1, other by 0
         TP_count = distance_thresholded.sum(axis=1) # count of AI detection within detection threshold of each annotated degradation
         recall = (TP_count > 0).sum() / len(TP_count) # TP / (TP+FN)
         recall_list.append(recall)
 
     ar = sum(recall_list) / len(recall_list)
-    return ar
+    return ar, recall_list
 
         
 
-def compute_precision_recall(distances_AI, distances_video, threshold):
-    tp_ai = (distances_AI < threshold).sum()
-    fp = (distances_AI > threshold).sum()
-    
-    tp_video = (distances_video < threshold).sum()
-    fn = (distances_video > threshold).sum()
-    
-    recall = tp_video / (tp_video + fn)
-    precision = tp_ai / (tp_ai + fp)
-
-    return precision, recall
-
-
-
-def fill_results_dict(threshold_dist, distances_AI, distances_video, results, class_name, thr):
-    # compute precision and recall
-    # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches with several predictions...
-    recall_dict = {}
-    precision_dict = {}
-    f1_dict = {}
-    for dthr in threshold_dist:
-        precision, recall = compute_precision_recall(distances_AI, distances_video, dthr)
-        recall_dict[f'{int(dthr)}m'] = recall
-        precision_dict[f'{int(dthr)}m'] = precision
-        f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
-
-    results['recall'][class_name][f'{thr:.1f}'] = recall_dict
-    results['precision'][class_name][f'{thr:.1f}'] = precision_dict
-    results['f1_score'][class_name][f'{thr:.1f}'] = f1_dict
-
-    return results
-
-
-
-def plot_distance_distributions(distances_AI, distances_video, outpath, class_name, thr):
-    bins = np.linspace(0, 50, 11)
-    
-    fig, ax1 = plt.subplots()
-    ax1.hist(np.clip(distances_AI, bins[0], bins[-1]), bins=bins)
-    ax1.set_xlabel('distance [m]')
-    fig.savefig(f'{outpath}/{class_name}_AI_thr0{int(thr*10)}.png') # videocoding as reference
-    plt.close()
-                
-    fig, ax1 = plt.subplots()
-    ax1.hist(np.clip(distances_video, bins[0], bins[-1]), bins=bins)
-    ax1.set_xlabel('distance [m]')
-    fig.savefig(f'{outpath}/{class_name}_video_thr0{int(thr*10)}.png') # AI as reference
-    plt.close()
-
-
-def plot_precision_recall(results, dthr, score_thresholds, outpath, classes_comp):
-    fig_precision, axp = plt.subplots() # precision summary plot
-    axp.set_xlabel('score threshold')
-    axp.set_ylabel('precision')
-    fig_recall, axr = plt.subplots() # recall summary plot
-    axr.set_xlabel('score threshold')
-    axr.set_ylabel('recall')
-    fig_precision_recall, axpr = plt.subplots() # precision-recall summary plot
+def plot_precision_recall(results, dthr, outpath):
+    figpr, axpr = plt.subplots() # precision-recall summary plot
     axpr.set_xlabel('recall')
     axpr.set_ylabel('precision')
 
-    for ic in range(len(classes_comp)):
-        class_name = list(classes_comp.keys())[ic]
+    figf1, axf1 = plt.subplots(figsize=(8,6)) # F1-score summary plot
+    axf1.set_xlabel('score threshold')
+    axf1.set_ylabel('F1-score')
+
+    for cls, cls_dict in results.items():
+        dthr_dict = cls_dict[dthr]
+        
+        sthr_list = []
         precision_list = []
         recall_list = []
-        for thr in score_thresholds:
-            precision_list.append(results['precision'][class_name][f'{thr:.1f}'][f'{int(dthr)}m'])
-            recall_list.append(results['recall'][class_name][f'{thr:.1f}'][f'{int(dthr)}m'])
+        f1_list = []
+        for sthr, sthr_dict in dthr_dict.items():
+            if sthr == 'ap' or sthr == 'ar':
+                continue
+            sthr_list.append(float(sthr))
+            precision_list.append(sthr_dict['precision'])
+            recall_list.append(sthr_dict['recall'])
+            f1_list.append(sthr_dict['f1_score'])
 
-        axp.plot(score_thresholds, precision_list, label=class_name)
-        axr.plot(score_thresholds, recall_list, label=class_name)
-        p = axpr.plot(recall_list, precision_list, label=class_name, marker='o')
+        axpr.plot(recall_list, precision_list, label=cls, marker='o', markersize=4)
+        p = axf1.plot(sthr_list, f1_list, label=cls)
         col = p[-1].get_color()
-        for x, y, sthr in zip(recall_list, precision_list, score_thresholds):
-            if (not np.isnan(x)) and (not np.isnan(y)):
-                plt.text(x, y, f'{sthr:.1f}', color=col)
 
-    axp.legend()
-    fig_precision.savefig(f'{outpath}/precision_{int(dthr)}m.png') # AI as reference
-    axr.legend()
-    fig_recall.savefig(f'{outpath}/recall_{int(dthr)}m.png') # AI as reference
-    axpr.legend()
-    fig_precision_recall.set_tight_layout(True)
-    fig_precision_recall.savefig(f'{outpath}/precision_recall_{int(dthr)}m.png') # AI as reference
+        # get max f1 score and add to plot
+        maxf1_id = np.argmax(np.array(f1_list))
+        xmax = np.array(sthr_list)[maxf1_id]
+        ymax = np.array(f1_list)[maxf1_id]
+        axf1.plot([xmax, xmax], [0, ymax], color=col, linestyle='--', linewidth=1)
+        axf1.plot([0, xmax], [ymax, ymax], color=col, linestyle='--', linewidth=1)
+        plt.text(xmax, 0, f'{xmax:.2f}', color=col, horizontalalignment='right', verticalalignment='top', rotation=45, fontsize='small')
+        plt.text(0, ymax, f'{ymax:.2f}', color=col, horizontalalignment='right', verticalalignment='center', fontsize='small')
+
+    axpr.legend(bbox_to_anchor=(0.5, 1.2), loc='upper center', ncol=3, fontsize='small')
+    figpr.set_tight_layout(True)
+    figpr.savefig(f'{outpath}/precision_recall_{dthr}.png')
+
+    axf1.legend(bbox_to_anchor=(0.5, 1.2), loc='upper center', ncol=3, fontsize='medium')
+    axf1.set_xlim(0)
+    axf1.set_ylim(0)
+    figf1.set_tight_layout(True)
+    figf1.savefig(f'{outpath}/f1_score_{dthr}.png')
+
     plt.close('all')
                 
         
@@ -152,11 +112,7 @@ def main(args):
     classes_AI = cls_config['classes_AI']
     classes_comp= cls_config['classes_comp']
         
-    results = {'recall':{}, 'precision':{}, 'f1_score':{}, 'ap':{}, 'ar':{}}
-    if args.type=='seg': # not controlling scores for segmentation
-        thrs = [0.]
-    else:
-        thrs = np.arange(0.1,0.9,0.1)
+    results = {}
 
     # number of detection to keep for average recall calculation =
     # number of frames in interval given by +-
@@ -210,12 +166,6 @@ def main(args):
                 # loop over classes
                 for ic in range(len(classes_comp)):
                     class_name = list(classes_comp.keys())[ic]
-                    results['recall'][class_name] = {}
-                    results['precision'][class_name] = {}
-                    results['f1_score'][class_name] = {}
-
-                    distances_AI_list = [[] for _ in range(len(thrs))]
-                    distances_video_list = [[] for _ in range(len(thrs))]
 
                     distances_AI_full = [] # for AP, dim N_detection_AI
                     score_full = [] # for AP, dim N_detection_AI
@@ -236,48 +186,31 @@ def main(args):
                             distances_array, score_array = compute_distances(lv, lai, score, N_ai) # for average recall
                             distances_array_full.append(distances_array)
                             score_array_full.append(score_array)
-                        
-                        # loop over thresholds (0.3 -> 0.8)
-                        for it, thr in enumerate(thrs):
-                            lai_thr = lai[score > thr]  # apply threshold to length_AI
 
-                            distances_AI_list[it].append( compute_smallest_distances(lai_thr, lv) )
-                            distances_video_list[it].append( compute_smallest_distances(lv, lai_thr) )
+                    # combine results of videos
+                    distances_AI_full = np.array(distances_AI_full)
+                    score_full = np.array(score_full)
+                    if len(distances_array_full) > 0 and len(score_array_full) > 0:
+                        distances_array_full = np.concatenate(distances_array_full)
+                        score_array_full = np.concatenate(score_array_full)
+                    else:
+                        distances_AI_array_full, score_array_full = np.array([]), np.array([])
 
+                    ap_dict = {}
+                    ar_dict = {}
+                    precision_recall_dict = {}
+                    for dthr in args.threshold_dist:
+                        ap, precision_list, tp_scores = compute_average_precision(distances_AI_full, score_full, dthr)
+                        ap_dict[f'{int(dthr)}m'] = ap
 
-                    ######## compute average precision and average recall ##########
-                    if args.type != 'seg':
-                        distances_AI_full = np.array(distances_AI_full)
-                        score_full = np.array(score_full)
-                        if len(distances_array_full) > 0 and len(score_array_full) > 0:
-                            distances_array_full = np.concatenate(distances_array_full)
-                            score_array_full = np.concatenate(score_array_full)
-                        else:
-                            distances_AI_array_full, score_array_full = np.array([]), np.array([])
-                        
-                        ap_dict = {}
-                        ar_dict = {}
-                        for dthr in args.threshold_dist:
-                            ap = compute_average_precision(distances_AI_full, score_full, dthr)
-                            ap_dict[f'{int(dthr)}m'] = ap
+                        ar, recall_list = compute_average_recall(distances_array_full, score_array_full, dthr, tp_scores)
+                        ar_dict[f'{int(dthr)}m'] = ar
 
-                            ar = compute_average_recall(distances_array_full, score_array_full, dthr)
-                            ar_dict[f'{int(dthr)}m'] = ar
-                            
-                        results['ap'][class_name] = ap_dict
-                        results['ar'][class_name] = ar_dict
+                        precision_recall_dict[f'{int(dthr)}m'] = {'ap':ap, 'ar':ar}
+                        for p, r, s in zip(precision_list, recall_list, tp_scores):
+                            precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
 
-
-                    # new loop over thresholds to compute precision and recall across all videos
-                    for it, thr in enumerate(thrs):
-                        distances_AI = np.concatenate(distances_AI_list[it])
-                        distances_video = np.concatenate(distances_video_list[it])
-
-                        # plot distance distributions
-                        plot_distance_distributions(distances_AI, distances_video, outpath, class_name, thr)
-
-                        # compute precision and recall and store results
-                        results = fill_results_dict(args.threshold_dist, distances_AI, distances_video, results, class_name, thr)
+                    results[class_name] = precision_recall_dict
 
                 with open(f'{outpath}/results.json', 'w') as fout:
                     json.dump(results, fout, indent = 6)
@@ -327,45 +260,32 @@ def main(args):
                 # loop over classes
                 for ic, (lai, score, lv) in enumerate(zip(length_AI, length_AI_score, length_video)):
                     class_name = list(classes_comp.keys())[ic]
-                    results['recall'][class_name] = {}
-                    results['precision'][class_name] = {}
-                    results['f1_score'][class_name] = {}
+                    results[class_name] = {}
 
                     lai = np.array(lai)
                     score = np.array(score)
 
+                    distances_AI_full = compute_smallest_distances(lai, lv) # distances with no score threshold applied
+                    if len(lv) > 0 and len(lai) > 0:
+                        distances_AI_array_full, score_array_full = compute_distances(lv, lai, score, N_ai) # for average recall
+                    else:
+                        distances_AI_array_full, score_array_full = np.array([]), np.array([])
 
-                    ########## compute average precision
-                    if args.type != 'seg':
-                        distances_AI_full = compute_smallest_distances(lai, lv) # distances with no score threshold applied
-                        if len(lv) > 0 and len(lai) > 0:
-                            distances_AI_array_full, score_array_full = compute_distances(lv, lai, score, N_ai) # for average recall
-                        else:
-                            distances_AI_array_full, score_array_full = np.array([]), np.array([])
-                        
-                        ap_dict = {}
-                        ar_dict = {}
-                        for dthr in args.threshold_dist:
-                            ap = compute_average_precision(distances_AI_full, score, dthr)
-                            ap_dict[f'{int(dthr)}m'] = ap
-                            ar = compute_average_recall(distances_AI_array_full, score_array_full, dthr)
-                            ar_dict[f'{int(dthr)}m'] = ar
-                        results['ap'][class_name] = ap_dict
-                        results['ar'][class_name] = ar_dict
+                    ap_dict = {}
+                    ar_dict = {}
+                    precision_recall_dict = {}
+                    for dthr in args.threshold_dist:
+                        ap, precision_list, tp_scores = compute_average_precision(distances_AI_full, score, dthr)
+                        ap_dict[f'{int(dthr)}m'] = ap
 
+                        ar, recall_list = compute_average_recall(distances_AI_array_full, score_array_full, dthr, tp_scores)
+                        ar_dict[f'{int(dthr)}m'] = ar
 
-                    # loop over thresholds
-                    for thr in thrs:
-                        lai_thr = lai[score > thr]  # apply threshold to length_AI
+                        precision_recall_dict[f'{int(dthr)}m'] = {'ap' : ap, 'ar' : ar}
+                        for p, r, s in zip(precision_list, recall_list, tp_scores):
+                            precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
 
-                        distances_AI = compute_smallest_distances(lai_thr, lv)
-                        distances_video = compute_smallest_distances(lv, lai_thr)
-
-                        # plot
-                        plot_distance_distributions(distances_AI, distances_video, outpath, class_name, thr)
-
-                        # compute precision and recall and store results
-                        results = fill_results_dict(args.threshold_dist, distances_AI, distances_video, results, class_name, thr)
+                    results[class_name] = precision_recall_dict
 
                 with open(f'{outpath}/results.json', 'w') as fout:
                     json.dump(results, fout, indent = 6)
@@ -380,13 +300,13 @@ def main(args):
         outpath = f'{outpath_base}/{videocoder}'
         with open(f'{outpath}/results.json', 'r') as f:
             results = json.load(f)
-            
+
         for dthr in args.threshold_dist:
-            plot_precision_recall(results, dthr, thrs, outpath, classes_comp)
+            plot_precision_recall(results, f'{int(dthr)}m', outpath)
 
         print('class  AP  F1_score')
-        for (cls, ap_dict), f1_dict in zip(results['ap'].items(), results['f1_score'].values()):
-            print(cls, f'{ap_dict[distance_thr]:.3f}', f'{f1_dict[score_thrs[cls]][distance_thr]:.3f}')
+#        for (cls, ap_dict), f1_dict in zip(results['ap'].items(), results['f1_score'].values()):
+#            print(cls, f'{ap_dict[distance_thr]:.3f}', f'{f1_dict[score_thrs[cls]][distance_thr]:.3f}')
 
 
             
@@ -402,7 +322,7 @@ if __name__ == '__main__':
     parser.add_argument('--csv')
     
     # args for AI
-    parser.add_argument('--type', choices=['cls', 'det', 'seg'], required=True)
+    parser.add_argument('--type', choices=['cls', 'det'], required=True)
     parser.add_argument('--config', required=True)
     parser.add_argument('--checkpoint', required=True)
     
