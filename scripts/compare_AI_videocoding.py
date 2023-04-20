@@ -134,7 +134,10 @@ def main(args):
         if not args.post_process:
             # load dicts to link predefined videos and their videocoding files
             videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
-            json_dict_list = [ videocoding_config['json_dict_gaetan'], videocoding_config['json_dict_leo'], videocoding_config['json_dict_nestor'] ]
+            json_dict_list = []
+            for iv, videocoder in enumerate(args.videocoders):
+                json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
+                json_dict_list.append(json_dict)
             inputpath = videocoding_config['inputpath']
 
             # get length for videocoding (for all videocoders) and predictions from all videos
@@ -243,7 +246,10 @@ def main(args):
             if args.json is None:
                 # load dicts to link predefined videos and their videocoding files
                 videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
-                json_dict_list = [ videocoding_config['json_dict_gaetan'], videocoding_config['json_dict_leo'], videocoding_config['json_dict_nestor'] ]
+                json_dict_list = []
+                for iv, videocoder in enumerate(args.videocoders):
+                    json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
+                    json_dict_list.append(json_dict)
 
                 video_name = args.inputvideo.split('/')[-1]
                 video_path = '/'.join(args.inputvideo.split('/')[:-1])
@@ -327,12 +333,12 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--videocoders', nargs=3, type=str, default=['Gaetan', 'Leo', 'Nestor'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier'], help='name of videocoders we compare AI to.')
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     
     # args for single videos
     parser.add_argument('--inputvideo')
-    parser.add_argument('--json', nargs=3, type=str, help='path to json files from Gaetan, Leo and Nestor (in the order of "--videocoders").')
+    parser.add_argument('--json', nargs='*', type=str, help='path to json files from Gaetan, Leo and Nestor (in the order of "--videocoders").')
     parser.add_argument('--csv')
     
     # args for AI
