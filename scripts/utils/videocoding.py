@@ -194,7 +194,7 @@ def get_length_timestamp_map(geoptis_csvpath):
     traveled_distances = np.concatenate([[0.0], traveled_distances])
     distance_for_timestamp = interp1d(traj_times, traveled_distances)
 
-    return traj_times[0], distance_for_timestamp
+    return traj_times[0], distance_for_timestamp, traveled_distances[-1]
 
 
 
@@ -250,8 +250,8 @@ def compute_distances(length_vid, length_AI, AI_score, N_ai):
 
 
 
-def extract_lengths_videocoding(jsonpath, geoptis_csvpath,
-                                classes_vid, classes_comp, process_every_nth_meter):
+def extract_lengths_videocoding(jsonpath, geoptis_csvpath, classes_vid,
+                                classes_comp, process_every_nth_meter, return_max_distance=False):
     '''
     Return length of videocoded degradations from start of mission.
     '''
@@ -270,7 +270,7 @@ def extract_lengths_videocoding(jsonpath, geoptis_csvpath,
         print('')
         sys.exit()
 
-    traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
+    traj_times_0, distance_for_timestamp, max_distance = get_length_timestamp_map(geoptis_csvpath)
     classname_to_deg_index = {name: i for i, name in enumerate(classes)}
     deg_index_to_classname = {i: name for name, i in classname_to_deg_index.items()}
 
@@ -313,7 +313,10 @@ def extract_lengths_videocoding(jsonpath, geoptis_csvpath,
                 for d in dist_array:
                     length_video[idx].append(d)
 
-    return length_video
+    if return_max_distance:
+        return length_video, max_distance
+    else:
+        return length_video
 
 
 
@@ -325,7 +328,7 @@ def extract_lengths_AI(videopath, geoptis_csvpath, classes_AI, classes_comp, ai_
     Run inference on extracted images with pretrained model.
     Return length of detected degradations from start of mission.
     '''
-    traj_times_0, distance_for_timestamp = get_length_timestamp_map(geoptis_csvpath)
+    traj_times_0, distance_for_timestamp, max_distance = get_length_timestamp_map(geoptis_csvpath)
 
     # length list for each AI class
     length_AI = [[] for _ in range(len(classes_comp))]

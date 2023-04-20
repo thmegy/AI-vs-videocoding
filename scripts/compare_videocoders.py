@@ -44,7 +44,7 @@ def compute_precision_recall(distances_AI, distances_video, threshold):
 
 
 def plot_distance_distributions(distances_video_1, distances_video_2, outpath, class_name):
-    bins = np.linspace(0, 50, 11)
+    bins = np.linspace(0, 50, 26)
     
     fig, ax1 = plt.subplots()
     ax1.hist(np.clip(distances_video_1, bins[0], bins[-1]), bins=bins)
@@ -95,6 +95,31 @@ def plot_precision_recall(results, outpath):
     fig.set_tight_layout(True)
     fig.savefig(f'{outpath}/precision_recall.png')
     plt.close('all')
+
+
+    
+def plot_timeline(presence_array, videocoders, outname):
+    '''
+    Plot, for a given video, whether a degradation has been annotated or not by each videocoder.
+    '''
+    cmap_binary = mpl.colors.ListedColormap(['red', 'green'])
+    cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue'])
+
+    fig, ax = plt.subplots(2, sharex=True)
+    praw = ax[0].imshow(presence_array, aspect='auto', interpolation='none', cmap=cmap_binary, vmin=0, vmax=2)
+    ax[0].set_yticks(np.arange(len(videocoders)))
+    ax[0].set_yticklabels(videocoders)
+
+    psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=5)
+
+    cbar_binary = fig.colorbar(praw, ax=ax[0], ticks=[0.5, 1.5])
+    cbar_binary.ax.set_yticklabels(['0','1'])
+    cbar = fig.colorbar(psum, ax=ax[1], ticks=[0.5, 1.5, 2.5, 3.5, 4.5])
+    cbar.ax.set_yticklabels(['0','1','2','3','4'])
+    
+    fig.set_tight_layout(True)
+    fig.savefig(outname)
+    plt.close('all')
     
                 
         
@@ -104,97 +129,137 @@ def main(args):
     cls_config =  hjson.load(open(args.cls_config, 'r'))
     classes_vid = cls_config['classes_vid']
     classes_comp= cls_config['classes_comp']
-
-    # load dicts to link predefined videos and their videocoding files
+    
     videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
-    json_dict_list = [ videocoding_config['json_dict_gaetan'], videocoding_config['json_dict_leo'], videocoding_config['json_dict_nestor'] ]
     inputpath = videocoding_config['inputpath']
-
     
-    # get length for each videocoder from all videos
-    length_video_list_videocoders = [] #(N_videocoders, N_video, N_classes, N_degradations)
-    for json_dict in json_dict_list:
-        length_video_list = [] #(N_videos, N_classes, N_degradations)
+    # get length for each videocoder from all videos, and unique combinations of videocoders
+    length_video_dict = {}
+    combinations = []
+    max_distance_list = [] # list of max distance travelled in each video
+    video_list = [] # name of videos
+    for iv, videocoder in enumerate(args.videocoders):
+        json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
+        length_video_list = [] # (N_videos, N_classes, N_degradations)
         for vid, jjson in json_dict.items():
-            length_video = extract_lengths_videocoding(inputpath+'/'+jjson, inputpath+'/'+vid.replace('mp4', 'csv'),
-                                                       classes_vid, classes_comp, args.process_every_nth_meter)
+            length_video, max_distance = extract_lengths_videocoding(inputpath+'/'+jjson, inputpath+'/'+vid.replace('mp4', 'csv'),
+                                                                     classes_vid, classes_comp, args.process_every_nth_meter,
+                                                                     return_max_distance=True)
             length_video_list.append(length_video)
+            if iv==0:
+                max_distance_list.append(max_distance)
+                video_list = list(json_dict.keys())
             
-        length_video_list_videocoders.append(length_video_list)
+        length_video_dict[videocoder] = length_video_list
 
-        
-    # loop over videocoders taken as reference
-    for ic, (length_video_list_ref, videocoder_ref) in enumerate(zip(length_video_list_videocoders, args.videocoders)):
-        # remove reference videocoders from lists
-        length_video_list_videocoders_tmp = length_video_list_videocoders[:ic] + length_video_list_videocoders[ic+1:]
-        videocoders_tmp = args.videocoders[:ic] + args.videocoders[ic+1:]
+        # get combinations
+        videocoders_tmp = args.videocoders[:iv] + args.videocoders[iv+1:]
+        for videocoder_other in videocoders_tmp:
+            comb = {videocoder, videocoder_other}
+            if comb not in combinations:
+                combinations.append(comb)
 
-        # loop over the other videocoders
-        for length_video_list_other, videocoder_other in zip(length_video_list_videocoders_tmp, videocoders_tmp):
-            print(f'\n\n{videocoder_ref}_vs_{videocoder_other}\n')
-            outpath = f'results_comparison/videocoders/{videocoder_ref}_vs_{videocoder_other}'
-            os.makedirs(outpath, exist_ok=True)
-    
-            results = {'recall':{}, 'precision':{}, 'f1_score':{}}
-                   
-            # compute distances for all classes          
-            # loop over classes
-            for ic in range(len(classes_comp)):
-                class_name = list(classes_comp.keys())[ic]
-                results['recall'][class_name] = {}
-                results['precision'][class_name] = {}
-                results['f1_score'][class_name] = {}
-        
-                distances_video_list_ref = []
-                distances_video_list_other = []
-            
-                # loop over videos
-                for length_video_ref, length_video_other in zip(length_video_list_ref, length_video_list_other):
-                    lv1 = length_video_ref[ic]
-                    lv2 = length_video_other[ic]
-
-                    distances_video_list_ref.append( compute_smallest_distances(lv1, lv2) )
-                    distances_video_list_other.append( compute_smallest_distances(lv2, lv1) )
-            
-                distances_video_ref = np.concatenate(distances_video_list_ref)
-                distances_video_other = np.concatenate(distances_video_list_other)
-
-                # plot distance distributions
-                plot_distance_distributions(distances_video_ref, distances_video_other, outpath, class_name)
                 
-                # compute precision and recall
-                # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches wit several predictions...
-                recall_dict = {}
-                precision_dict = {}
-                f1_dict = {}
-                for dthr in args.threshold:
-                    precision, recall = compute_precision_recall(distances_video_other, distances_video_ref, dthr)
-                    recall_dict[f'{int(dthr)}m'] = recall
-                    precision_dict[f'{int(dthr)}m'] = precision
-                    f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
+    # loop over videocoders combinations
+    for comb in combinations:
+        videocoder_1, videocoder_2 = list(comb)
+        length_video_list_1, length_video_list_2 = length_video_dict[videocoder_1], length_video_dict[videocoder_2]
+        print(f'\n\n{videocoder_1}_vs_{videocoder_2}\n')
+        print(f'{"class" : <30}{"F1_score": ^10}')
+        outpath = f'results_comparison/videocoders/{videocoder_1}_vs_{videocoder_2}'
+        os.makedirs(outpath, exist_ok=True)
+    
+        results = {'recall':{}, 'precision':{}, 'f1_score':{}}
+                   
+        # compute distances for all classes          
+        # loop over classes
+        for ic in range(len(classes_comp)):
+            class_name = list(classes_comp.keys())[ic]
+            results['recall'][class_name] = {}
+            results['precision'][class_name] = {}
+            results['f1_score'][class_name] = {}
 
-                results['recall'][class_name] = recall_dict
-                results['precision'][class_name] = precision_dict
-                results['f1_score'][class_name] = f1_dict
+            distances_video_list_1 = []
+            distances_video_list_2 = []
 
-                distance_thr = '10m' # threshold used to extract single summary figures
-                print(f'{class_name} {results["f1_score"][class_name][distance_thr]:.3f}')
+            # loop over videos
+            for length_video_1, length_video_2 in zip(length_video_list_1, length_video_list_2):
+                lv1 = length_video_1[ic]
+                lv2 = length_video_2[ic]
 
-                plot_evolution(results, 'precision', 'Precision', outpath)
-                plot_evolution(results, 'recall', 'Recall', outpath)
-                plot_precision_recall(results, outpath)
+                distances_video_list_1.append( compute_smallest_distances(lv1, lv2) )
+                distances_video_list_2.append( compute_smallest_distances(lv2, lv1) )
+
+            distances_video_1 = np.concatenate(distances_video_list_1)
+            distances_video_2 = np.concatenate(distances_video_list_2)
+
+            # plot distance distributions
+            plot_distance_distributions(distances_video_1, distances_video_2, outpath, class_name)
+
+            # compute precision and recall
+            # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches wit several predictions...
+            recall_dict = {}
+            precision_dict = {}
+            f1_dict = {}
+            for dthr in args.threshold:
+                precision, recall = compute_precision_recall(distances_video_2, distances_video_1, dthr)
+                recall_dict[f'{int(dthr)}m'] = recall
+                precision_dict[f'{int(dthr)}m'] = precision
+                f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
+
+            results['recall'][class_name] = recall_dict
+            results['precision'][class_name] = precision_dict
+            results['f1_score'][class_name] = f1_dict
+
+            distance_thr = '10m' # threshold used to extract single summary figures
+            print(f'{class_name : <30} {results["f1_score"][class_name][distance_thr]:^10.3f}')
+
+            plot_evolution(results, 'precision', 'Precision', outpath)
+            plot_evolution(results, 'recall', 'Recall', outpath)
+            plot_precision_recall(results, outpath)
+
+            with open(f'{outpath}/results.json', 'w') as fout:
+                json.dump(results, fout, indent = 6)
+
+
+                
+    # make map of agreement between all videocoders
+
+    distance_threshold = 10
+    length_video_list_videocoders = [l for l in length_video_dict.values()]
+
+    max_distance_list = [int(m)+1 for m in max_distance_list] # only integers
+    
+    # loop over classes
+    for ic in range(len(classes_comp)):
+        class_name = list(classes_comp.keys())[ic]
         
-                with open(f'{outpath}/results.json', 'w') as fout:
-                    json.dump(results, fout, indent = 6)
+        # loop over videos
+        for iv, video in enumerate(video_list):
+            presence_array = np.zeros((len(args.videocoders), max_distance_list[iv])) # 1 if degradation present, 0 otherwise
+            
+            # loop over videocoders
+            for ivc, length_video_list in enumerate(length_video_list_videocoders):
+                degr_list = np.array(length_video_list[iv][ic]).astype(int)
+                # add frames in interval +- distance_threshold around each degradation
+                if degr_list.size:
+                    degr_list = np.unique(np.concatenate([ np.arange(d-distance_threshold, d+distance_threshold+1) for d in degr_list ]))
+                    # keep frames within bounds of video
+                    degr_list = degr_list[(degr_list >=0) & (degr_list<max_distance_list[iv])]
+                degr_list = np.array(degr_list)
+                presence_array[ivc, degr_list] = 1
+
+            ## TO DO : loop over frames --> count of videocoders declaring a degradation on each frame
+            plot_timeline(presence_array, args.videocoders, f'results_comparison/videocoders/{video.replace(".mp4", "")}_{class_name}_timeline.png')
 
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--videocoders', nargs=3, type=str, default=['Gaetan', 'Leo', 'Nestor'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier'], help='name of videocoders we compare AI to.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     
-    parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
+    parser.add_argument('--process-every-nth-meter', type=float, default=1, help='step in meters between processed frames.')
     parser.add_argument("--threshold", type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
     args = parser.parse_args()
