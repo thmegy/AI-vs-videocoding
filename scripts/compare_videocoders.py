@@ -98,26 +98,73 @@ def plot_precision_recall(results, outpath):
 
 
     
-def plot_timeline(presence_array, videocoders, outname):
+def plot_timeline(presence_array, videocoders, class_name, outname):
     '''
     Plot, for a given video, whether a degradation has been annotated or not by each videocoder.
     '''
     cmap_binary = mpl.colors.ListedColormap(['red', 'green'])
     cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue'])
 
-    fig, ax = plt.subplots(2, sharex=True)
+    fig, ax = plt.subplots(2, sharex=True, gridspec_kw={'height_ratios':(2,1)})
     praw = ax[0].imshow(presence_array, aspect='auto', interpolation='none', cmap=cmap_binary, vmin=0, vmax=2)
     ax[0].set_yticks(np.arange(len(videocoders)))
     ax[0].set_yticklabels(videocoders)
 
     psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=5)
+    ax[1].set_yticks([0.])
+    ax[1].set_yticklabels([''])
+    ax[1].set_xlabel('distance [m]')
 
     cbar_binary = fig.colorbar(praw, ax=ax[0], ticks=[0.5, 1.5])
     cbar_binary.ax.set_yticklabels(['0','1'])
+    cbar_binary.set_label(f'Présence {class_name}')
     cbar = fig.colorbar(psum, ax=ax[1], ticks=[0.5, 1.5, 2.5, 3.5, 4.5])
     cbar.ax.set_yticklabels(['0','1','2','3','4'])
+    cbar.set_label(f'Somme')
     
     fig.set_tight_layout(True)
+    fig.savefig(outname)
+    plt.close('all')
+
+
+    
+def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_list, outname):
+    '''
+    Plot, for all reference videos, whether a degradation has been annotated or not by each videocoder.
+    '''
+    cmap_binary = mpl.colors.ListedColormap(['red', 'green'])
+    cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue'])
+
+    fig = plt.figure(figsize=(34,9))
+    subfigs_cbar = fig.subfigures(nrows=1, ncols=2, width_ratios=(10,1))
+    subfigs = subfigs_cbar[0].subfigures(nrows=2, ncols=7)
+    subfigs = subfigs.flatten()
+    
+    for iv, (vid, presence_array) in enumerate(zip(video_list, presence_array_list)):
+        ax = subfigs[iv].subplots(2, sharex=True, gridspec_kw={'height_ratios':(2,1)})
+        praw = ax[0].imshow(presence_array, aspect='auto', interpolation='none', cmap=cmap_binary, vmin=0, vmax=2)
+        ax[0].set_yticks(np.arange(len(videocoders)))
+        ax[0].set_yticklabels(videocoders)
+        ax[0].set_title(vid, fontsize='small')
+
+        psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=5)
+        ax[1].set_yticks([])
+        ax[1].set_yticklabels([])
+        ax[1].set_xlabel('distance [m]')
+
+
+    ax = subfigs_cbar[1].subplots()
+    ax.axis('off')
+    cax = subfigs_cbar[1].add_axes([0.6, 0.1, 0.2, 0.8])
+    cbar = subfigs_cbar[1].colorbar(psum, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5, 4.5])
+    cbar.ax.set_yticklabels(['0','1','2','3','4'])
+    cbar.set_label(f'Somme')
+
+    cax_binary = subfigs_cbar[1].add_axes([0.2, 0.1, 0.2, 0.8])
+    cbar_binary = subfigs_cbar[1].colorbar(praw, cax=cax_binary, ticks=[0.5, 1.5])
+    cbar_binary.ax.set_yticklabels(['0','1'])
+    cbar_binary.set_label(f'Présence {class_name}')
+    
     fig.savefig(outname)
     plt.close('all')
     
@@ -223,8 +270,8 @@ def main(args):
 
 
                 
-    # make map of agreement between all videocoders
-
+    # make timeline of agreement between all videocoders
+    assert args.process_every_nth_meter==1, '--process-every-nth-meter needs to be 1m for timeline plots !'
     distance_threshold = 10
     length_video_list_videocoders = [l for l in length_video_dict.values()]
 
@@ -235,6 +282,7 @@ def main(args):
         class_name = list(classes_comp.keys())[ic]
         
         # loop over videos
+        presence_array_list = []
         for iv, video in enumerate(video_list):
             presence_array = np.zeros((len(args.videocoders), max_distance_list[iv])) # 1 if degradation present, 0 otherwise
             
@@ -249,8 +297,10 @@ def main(args):
                 degr_list = np.array(degr_list)
                 presence_array[ivc, degr_list] = 1
 
-            ## TO DO : loop over frames --> count of videocoders declaring a degradation on each frame
-            plot_timeline(presence_array, args.videocoders, f'results_comparison/videocoders/{video.replace(".mp4", "")}_{class_name}_timeline.png')
+            #plot_timeline(presence_array, args.videocoders, class_name, f'results_comparison/videocoders/{video.replace(".mp4", "")}_{class_name}_timeline.png')
+            presence_array_list.append(presence_array)
+
+        plot_timeline_grouped(presence_array_list, args.videocoders, class_name, video_list, f'results_comparison/videocoders/{class_name}_timeline.png')
 
             
 if __name__ == "__main__":
