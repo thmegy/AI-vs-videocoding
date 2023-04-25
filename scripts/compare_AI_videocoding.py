@@ -14,7 +14,11 @@ import matplotlib.pyplot as plt
 from utils import extract_lengths_videocoding, extract_lengths_AI, compute_smallest_distances, compute_distances
 
 
+
 def compute_average_precision(distances_AI, score, threshold_dist):
+    '''
+    Compute precision for every true positive detection, and corresponding average precision.
+    '''
     # sort examples
     sort_inds = np.argsort(-score)
     sort_dist = distances_AI[sort_inds]
@@ -33,6 +37,36 @@ def compute_average_precision(distances_AI, score, threshold_dist):
     ap = np.sum(precision) / total_pos
 
     return ap, precision[pos_inds], score[sort_inds][pos_inds], # AP, [precision_array], [score of true positives]
+
+
+
+def compute_average_precision_multiref(distances_list, score, threshold_dist):
+    '''
+    Compute precision for every true positive detection, and corresponding average precision, 
+    considering the combination of several videocoders as reference.
+    '''
+    # get number of videocoders agreeing with each IA detection
+    N_vid_agree = (distances_list < threshold_dist).sum(axis=0)
+    
+    # sort examples
+    sort_inds = np.argsort(-score)
+    sort_det = N_vid_agree[sort_inds]
+    
+    # count true positive examples
+    pos_inds = sort_det > 1
+    tp = np.cumsum(pos_inds)
+    total_pos = tp[-1]
+    
+    # count not difficult examples
+    pn_inds = sort_det != -1
+    pn = np.cumsum(pn_inds)
+
+    tp[np.logical_not(pos_inds)] = 0
+    precision = tp / pn
+    ap = np.sum(precision) / total_pos
+
+    return ap, precision[pos_inds], score[sort_inds][pos_inds], # AP, [precision_array], [score of true positives]
+
 
 
 def compute_average_recall(distance_array, score_array, dist_thr, score_thrs):
@@ -129,184 +163,124 @@ def main(args):
     # the largest distance threshold considered (detections beyand are necessarily FN)
     N_ai = 2 * (1 + args.threshold_dist[-1] // args.process_every_nth_meter)
 
-    # no input video given, treat all predefined videos and combine results
-    if args.inputvideo is None:
-        outpath_base = f'results_comparison/{args.type}'
-        
-        if not args.post_process:
-            # load dicts to link predefined videos and their videocoding files
-            videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
-            json_dict_list = []
-            for iv, videocoder in enumerate(args.videocoders):
-                json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
-                json_dict_list.append(json_dict)
-            inputpath = videocoding_config['inputpath']
-
-            # get length for videocoding (for all videocoders) and predictions from all videos
-            length_AI_list = []
-            length_AI_score_list = []
-            for vid in json_dict_list[0].keys():
-                print(f'\n{vid}')
-                length_AI, length_AI_score, extract_path = extract_lengths_AI(
-                    f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}', classes_AI, classes_comp,
-                    args.type, args.config, args.checkpoint, args.process_every_nth_meter
-                )
-                length_AI_list.append(length_AI)
-                length_AI_score_list.append(length_AI_score)
+#            if args.csv != args.inputvideo.replace('mp4', 'csv'):
+#                csv_path = args.csv.split('/')
+#                csv_path = '/'.join(csv_path[:-1])
+#                df = pd.read_csv(args.csv, delimiter=';', header=None, quotechar='%')
+#                for vid in pd.unique(df[0]):
+#                    df[df[0]==vid].to_csv(f'{csv_path}/{vid}.csv', header=False, sep=';', index=False, quotechar='%')
+#                args.csv = args.inputvideo.replace('mp4', 'csv')
 
 
-            length_video_list_videocoders = [] # (N_videocoders, N_videos, N_classes, N_degradations)
-            for json_dict in json_dict_list:
-                length_video_list = [] # (N_videos, N_classes, N_degradations)
-                for vid in json_dict.keys():
-                    jfile = json_dict[vid]
-                    length_video = extract_lengths_videocoding(
-                        f'{inputpath}/{jfile}', f'{inputpath}/{vid.replace("mp4", "csv")}',
-                        classes_vid, classes_comp, args.process_every_nth_meter
-                    )
+    outpath_base = f'results_comparison/{args.type}'
 
-                    length_video_list.append(length_video)
+    if not args.post_process:
+        # load dicts to link predefined videos and their videocoding files
+        videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
+        json_dict_list = []
+        for iv, videocoder in enumerate(args.videocoders):
+            json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
+            json_dict_list.append(json_dict)
+        inputpath = videocoding_config['inputpath']
 
-                length_video_list_videocoders.append(length_video_list)
-
-
-            # compute distances for all combinations of classes and thresholds                
-            # loop over videocoders
-            for length_video_list, videocoder in zip(length_video_list_videocoders, args.videocoders):
-                outpath = f'{outpath_base}/{videocoder}'
-                os.makedirs(outpath, exist_ok=True)
-
-                # loop over classes
-                for ic in range(len(classes_comp)):
-                    class_name = list(classes_comp.keys())[ic]
-
-                    distances_AI_full = [] # for AP, dim N_detection_AI
-                    score_full = [] # for AP, dim N_detection_AI
-                    
-                    distances_array_full = [] # for AR, dim (N_degradation_vid, N_ai)
-                    score_array_full = [] # for AR, dim (N_degradation_vid, N_ai)
-
-                    # loop over videos
-                    for length_AI, length_AI_score, length_video in zip(length_AI_list, length_AI_score_list, length_video_list):
-                        lai = np.array(length_AI[ic])
-                        score = np.array(length_AI_score[ic])
-                        lv = length_video[ic]
-
-                        distances_AI_full += compute_smallest_distances(lai, lv).tolist()
-                        score_full += length_AI_score[ic]
-                        
-                        if len(lv) > 0 and len(lai) > 0:
-                            distances_array, score_array = compute_distances(lv, lai, score, N_ai) # for average recall
-                            distances_array_full.append(distances_array)
-                            score_array_full.append(score_array)
-
-                    # combine results of videos
-                    distances_AI_full = np.array(distances_AI_full)
-                    score_full = np.array(score_full)
-                    if len(distances_array_full) > 0 and len(score_array_full) > 0:
-                        distances_array_full = np.concatenate(distances_array_full)
-                        score_array_full = np.concatenate(score_array_full)
-                    else:
-                        distances_AI_array_full, score_array_full = np.array([]), np.array([])
-
-                    ap_dict = {}
-                    ar_dict = {}
-                    precision_recall_dict = {}
-                    for dthr in args.threshold_dist:
-                        ap, precision_list, tp_scores = compute_average_precision(distances_AI_full, score_full, dthr)
-                        ap_dict[f'{int(dthr)}m'] = ap
-
-                        ar, recall_list = compute_average_recall(distances_array_full, score_array_full, dthr, tp_scores)
-                        ar_dict[f'{int(dthr)}m'] = ar
-
-                        precision_recall_dict[f'{int(dthr)}m'] = {'ap':ap, 'ar':ar}
-                        for p, r, s in zip(precision_list, recall_list, tp_scores):
-                            precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
-
-                    results[class_name] = precision_recall_dict
-
-                with open(f'{outpath}/results.json', 'w') as fout:
-                    json.dump(results, fout, indent = 6)
-
-            
-    # treat a single video
-    else:            
-        outpath_base = f'results_comparison/{args.type}/{args.inputvideo.split("/")[-1].replace(".mp4", "")}'
-
-        if not args.post_process:
-            if args.csv is None:
-                args.csv = args.inputvideo.replace('mp4', 'csv')
-
-            if args.csv != args.inputvideo.replace('mp4', 'csv'):
-                csv_path = args.csv.split('/')
-                csv_path = '/'.join(csv_path[:-1])
-                df = pd.read_csv(args.csv, delimiter=';', header=None, quotechar='%')
-                for vid in pd.unique(df[0]):
-                    df[df[0]==vid].to_csv(f'{csv_path}/{vid}.csv', header=False, sep=';', index=False, quotechar='%')
-                args.csv = args.inputvideo.replace('mp4', 'csv')
-
-            if args.json is None:
-                # load dicts to link predefined videos and their videocoding files
-                videocoding_config =  hjson.load(open(args.videocoding_config, 'r'))
-                json_dict_list = []
-                for iv, videocoder in enumerate(args.videocoders):
-                    json_dict = videocoding_config[f'json_dict_{videocoder}'] # load dict to link predefined videos and their videocoding files
-                    json_dict_list.append(json_dict)
-
-                video_name = args.inputvideo.split('/')[-1]
-                video_path = '/'.join(args.inputvideo.split('/')[:-1])
-                args.json = [ f'{video_path}/{json_dict[video_name]}' for json_dict in json_dict_list ]
-
-            # extract images and run inference
+        # get length for videocoding (for all videocoders) and predictions from all videos
+        length_AI_list = []
+        length_AI_score_list = []
+        for vid in json_dict_list[0].keys():
+            print(f'\n{vid}')
             length_AI, length_AI_score, extract_path = extract_lengths_AI(
-                args.inputvideo, args.csv, classes_AI, classes_comp,
+                f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}', classes_AI, classes_comp,
                 args.type, args.config, args.checkpoint, args.process_every_nth_meter
-                )
-            
-            # loop over videocoders            
-            for jfile, videocoder in zip(args.json, args.videocoders):
-                outpath = f'{outpath_base}/{videocoder}'
-                os.makedirs(outpath, exist_ok=True)
+            )
+            length_AI_list.append(length_AI)
+            length_AI_score_list.append(length_AI_score)
 
+
+        length_video_list_videocoders = [] # (N_videocoders, N_videos, N_classes, N_degradations)
+        for json_dict in json_dict_list:
+            length_video_list = [] # (N_videos, N_classes, N_degradations)
+            for vid in json_dict.keys():
+                jfile = json_dict[vid]
                 length_video = extract_lengths_videocoding(
-                    jfile, args.csv, classes_vid,
-                    classes_comp, args.process_every_nth_meter
+                    f'{inputpath}/{jfile}', f'{inputpath}/{vid.replace("mp4", "csv")}',
+                    classes_vid, classes_comp, args.process_every_nth_meter
                 )
 
-                # loop over classes
-                for ic, (lai, score, lv) in enumerate(zip(length_AI, length_AI_score, length_video)):
-                    class_name = list(classes_comp.keys())[ic]
-                    results[class_name] = {}
+                length_video_list.append(length_video)
 
-                    lai = np.array(lai)
-                    score = np.array(score)
+            length_video_list_videocoders.append(length_video_list)
 
-                    distances_AI_full = compute_smallest_distances(lai, lv) # distances with no score threshold applied
+
+        # compute distances for all combinations of classes and thresholds
+        # loop over videocoders
+
+        distances_AI_videocoders_list = [[] for _ in range(len(classes_comp))] # for AP combining all videocoders (N_classes, N_videocoders, N_detections)
+        AI_scores = [] # for AP combining all videocoders (N_classes, N_detections)
+        distances_array_videocoders_list = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_degradation_annot)
+        AI_scores_array = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_detections)
+
+        for iv, (length_video_list, videocoder) in enumerate(zip(length_video_list_videocoders, args.videocoders)):
+            outpath = f'{outpath_base}/{videocoder}'
+            os.makedirs(outpath, exist_ok=True)
+
+            # loop over classes
+            for ic in range(len(classes_comp)):
+                class_name = list(classes_comp.keys())[ic]
+
+                distances_AI_full = [] # for AP, dim N_detection_AI
+                score_full = [] # for AP, dim N_detection_AI
+
+                distances_array_full = [] # for AR, dim (N_degradation_annot, N_ai)
+                score_array_full = [] # for AR, dim (N_degradation_annot, N_ai)
+
+                # loop over videos
+                for length_AI, length_AI_score, length_video in zip(length_AI_list, length_AI_score_list, length_video_list):
+                    lai = np.array(length_AI[ic])
+                    score = np.array(length_AI_score[ic])
+                    lv = length_video[ic]
+
+                    distances_AI_full += compute_smallest_distances(lai, lv).tolist()
+                    score_full += length_AI_score[ic]
+
                     if len(lv) > 0 and len(lai) > 0:
-                        distances_AI_array_full, score_array_full = compute_distances(lv, lai, score, N_ai) # for average recall
-                    else:
-                        distances_AI_array_full, score_array_full = np.array([]), np.array([])
+                        distances_array, score_array = compute_distances(lv, lai, score, N_ai) # for average recall
+                        distances_array_full.append(distances_array)
+                        score_array_full.append(score_array)
 
-                    ap_dict = {}
-                    ar_dict = {}
-                    precision_recall_dict = {}
-                    for dthr in args.threshold_dist:
-                        ap, precision_list, tp_scores = compute_average_precision(distances_AI_full, score, dthr)
-                        ap_dict[f'{int(dthr)}m'] = ap
+                # combine results of videos
+                distances_AI_full = np.array(distances_AI_full)
+                score_full = np.array(score_full)
+                distances_AI_videocoders_list[ic].append(distances_AI_full)
+                if iv==0:
+                    AI_scores.append(score_full)
+                if len(distances_array_full) > 0 and len(score_array_full) > 0:
+                    distances_array_full = np.concatenate(distances_array_full)
+                    score_array_full = np.concatenate(score_array_full)
+                else:
+                    distances_array_full, score_array_full = np.array([]), np.array([])
+                distances_array_videocoders_list[ic].append(distances_array_full)
+                AI_scores_array[ic].append(score_array_full)
 
-                        ar, recall_list = compute_average_recall(distances_AI_array_full, score_array_full, dthr, tp_scores)
-                        ar_dict[f'{int(dthr)}m'] = ar
+                ap_dict = {}
+                ar_dict = {}
+                precision_recall_dict = {}
+                for dthr in args.threshold_dist:
+                    ap, precision_list, tp_scores = compute_average_precision(distances_AI_full, score_full, dthr)
+                    ap_dict[f'{int(dthr)}m'] = ap
 
-                        precision_recall_dict[f'{int(dthr)}m'] = {'ap' : ap, 'ar' : ar}
-                        for p, r, s in zip(precision_list, recall_list, tp_scores):
-                            precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
+                    ar, recall_list = compute_average_recall(distances_array_full, score_array_full, dthr, tp_scores)
+                    ar_dict[f'{int(dthr)}m'] = ar
 
-                    results[class_name] = precision_recall_dict
+                    precision_recall_dict[f'{int(dthr)}m'] = {'ap':ap, 'ar':ar}
+                    for p, r, s in zip(precision_list, recall_list, tp_scores):
+                        precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
 
-                with open(f'{outpath}/results.json', 'w') as fout:
-                    json.dump(results, fout, indent = 6)
+                results[class_name] = precision_recall_dict
 
-                    
+            with open(f'{outpath}/results.json', 'w') as fout:
+                json.dump(results, fout, indent = 6)
+
+                                
     ######### post-processing ##############
     distance_thr = '10m' # threshold used to extract single summary figures
 
@@ -328,7 +302,10 @@ def main(args):
             max_sthr = max_sthr_dict[cls]
             max_f1 = max_f1_dict[cls]
             print(f'{cls: <30}{max_sthr: ^10.2f}{dthr_dict["ap"]: ^10.3f}{dthr_dict["ar"]: ^10.3f}{max_f1: ^10.3f}')
-        
+
+    for ic, cls in enumerate(classes_comp):
+        ap, _,_ = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], int(distance_thr.replace('m','')))
+        print(cls[0], ap)
 
 
             
@@ -337,11 +314,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier'], help='name of videocoders we compare AI to.')
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
-    
-    # args for single videos
-    parser.add_argument('--inputvideo')
-    parser.add_argument('--json', nargs='*', type=str, help='path to json files from Gaetan, Leo and Nestor (in the order of "--videocoders").')
-    parser.add_argument('--csv')
     
     # args for AI
     parser.add_argument('--type', choices=['cls', 'det'], required=True)

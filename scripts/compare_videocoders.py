@@ -11,21 +11,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
-from utils import extract_lengths_videocoding
-
-
-
-def compute_smallest_distances(length_1, length_2):
-    # compute smallest distance for each element of length_1 wrt length_2 (arrays or lists)
-    distances = []        
-    for l1 in length_1:
-        if len(length_2) > 0:
-            dist = np.abs(l1 - np.array(length_2))
-            smallest_dist = np.min(dist)
-        else:
-            smallest_dist = 50
-        distances.append(smallest_dist)
-    return np.array(distances)
+from utils import extract_lengths_videocoding, compute_smallest_distances
 
 
 
