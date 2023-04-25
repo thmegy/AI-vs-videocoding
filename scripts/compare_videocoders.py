@@ -29,15 +29,15 @@ def compute_smallest_distances(length_1, length_2):
 
 
 
-def compute_precision_recall(distances_AI, distances_video, threshold):
-    tp_ai = (distances_AI < threshold).sum()
-    fp = (distances_AI > threshold).sum()
+def compute_precision_recall(distances_compared, distances_ref, threshold):
+    tp_compared = (distances_compared < threshold).sum()
+    fp = (distances_compared > threshold).sum()
     
-    tp_video = (distances_video < threshold).sum()
-    fn = (distances_video > threshold).sum()
+    tp_ref = (distances_ref < threshold).sum()
+    fn = (distances_ref > threshold).sum()
     
-    recall = tp_video / (tp_video + fn)
-    precision = tp_ai / (tp_ai + fp)
+    recall = tp_ref / (tp_ref + fn)
+    precision = tp_compared / (tp_compared + fp)
 
     return precision, recall
 
@@ -205,11 +205,10 @@ def main(args):
             comb = {videocoder, videocoder_other}
             if comb not in combinations:
                 combinations.append(comb)
-
                 
     # loop over videocoders combinations
     for comb in combinations:
-        videocoder_1, videocoder_2 = list(comb)
+        videocoder_1, videocoder_2 = sorted(list(comb))
         length_video_list_1, length_video_list_2 = length_video_dict[videocoder_1], length_video_dict[videocoder_2]
         print(f'\n\n{videocoder_1}_vs_{videocoder_2}\n')
         print(f'{"class" : <30}{"F1_score": ^10}')
@@ -244,7 +243,7 @@ def main(args):
             plot_distance_distributions(distances_video_1, distances_video_2, outpath, class_name)
 
             # compute precision and recall
-            # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches wit several predictions...
+            # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches with several predictions.
             recall_dict = {}
             precision_dict = {}
             f1_dict = {}
