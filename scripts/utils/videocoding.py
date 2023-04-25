@@ -137,9 +137,8 @@ def parse_videocoding(jsonpath):
     all_timestamps = []
     for section in content["elements"][0]["sections"]:
         events = section["events"]
-        # Rubric 0 is "image extraction samples", not degradation
-        degradation_events = [e for e in events if e["rubric"] > 0]
-
+        degradation_events = [e for e in events if e["rubric"] >= 0]
+        
         degradations = np.zeros((len(degradation_events), len(classnames)))
         for i, degradation_event in enumerate(degradation_events):
             class_id = degradation_event['rubric']
@@ -322,147 +321,118 @@ def extract_lengths_videocoding(jsonpath, geoptis_csvpath, classes_vid,
 
 
 def extract_lengths_AI(videopath, geoptis_csvpath, classes_AI, classes_comp, ai_type, ai_config,
-                      ai_checkpoint, process_every_nth_meter, filter_road=False, device='cuda:0'):
+                      ai_checkpoint, process_every_nth_meter, device='cuda:0'):
     '''
     Extract a frame of the video every n meter.
     Run inference on extracted images with pretrained model.
     Return length of detected degradations from start of mission.
     '''
-    traj_times_0, distance_for_timestamp, max_distance = get_length_timestamp_map(geoptis_csvpath)
-
-    # length list for each AI class
-    length_AI = [[] for _ in range(len(classes_comp))]
-    length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
-
-    cam = cv.VideoCapture(videopath)
     vid_name = videopath.split('/')[-1].replace(".mp4","")
     extract_path = f'prepare_annotations/processed_videos/{vid_name}/{process_every_nth_meter}'
-    
-    if not os.path.isdir(extract_path):
-        os.makedirs(extract_path)
-        # loop over video
-        t = traj_times_0
-        d_init = 0
-        while True:
-            ret, frame = cam.read()
-            if not ret:
-                break
-        
-            t += 1 / framerate
-            try:
-                d = distance_for_timestamp(t)
-            except:
-                continue
-        
-            if (d-d_init) < process_every_nth_meter:
-                continue
+    outfilename = f'{extract_path}/releve_IA.json'
+    if not os.path.isfile(outfilename):
 
-            d_init = d
+        traj_times_0, distance_for_timestamp, max_distance = get_length_timestamp_map(geoptis_csvpath)
 
-            # save frame
-            cv.imwrite(f'{extract_path}/{d}.jpg', frame)
+        # length list for each AI class
+        length_AI = [[] for _ in range(len(classes_comp))]
+        length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
 
+        cam = cv.VideoCapture(videopath)
 
-    extracted_frames = glob.glob(f'{extract_path}/*.jpg')
-
-    # road segmentation
-    if filter_road:
-        extract_path += '_road_filter'
         if not os.path.isdir(extract_path):
             os.makedirs(extract_path)
-            
-            from mmseg.apis import inference_segmentor, init_segmentor
-            road_filter = init_segmentor(
-                '/home/theo/workdir/mmseg/mmsegmentation/configs/segformer/segformer_mit-b2_8x1_1024x1024_160k_cityscapes.py',
-                '/home/theo/workdir/mmseg/checkpoints/segformer_mit-b2_8x1_1024x1024_160k_cityscapes_20211207_134205-6096669a.pth',
-                device=device
-            )
+            # loop over video
+            t = traj_times_0
+            d_init = 0
+            while True:
+                ret, frame = cam.read()
+                if not ret:
+                    break
 
-            for fname in extracted_frames:
-                frame = cv.imread(fname)
+                t += 1 / framerate
+                try:
+                    d = distance_for_timestamp(t)
+                except:
+                    continue
 
-                frame_seg = inference_segmentor(road_filter, frame)[0]
-                mask_road = frame_seg[:,:,np.newaxis] == 0 # road pixels
-                frame = np.where(mask_road, frame, 0)
+                if (d-d_init) < process_every_nth_meter:
+                    continue
+
+                d_init = d
 
                 # save frame
-                im_name = fname.split('/')[-1]
-                cv.imwrite(f'{extract_path}/{im_name}', frame)
+                cv.imwrite(f'{extract_path}/{d}.jpg', frame)
+
 
         extracted_frames = glob.glob(f'{extract_path}/*.jpg')
 
-    # load model
-    if ai_type == 'cls':
-        import mmcls.apis
-        model = mmcls.apis.init_model(
-            ai_config,
-            ai_checkpoint,
-            device=device,
-        )
-    elif ai_type == 'det':
-        import mmdet.apis
-        model = mmdet.apis.init_detector(
-            ai_config,
-            ai_checkpoint,
-            device=device,
-        )
-    elif ai_type == 'seg':
-        import mmseg.apis
-        model = mmseg.apis.init_segmentor(
-            ai_config,
-            ai_checkpoint,
-            device=device,
-        )
-
-    # run inference on extracted frames
-    for fname in tqdm.tqdm(extracted_frames):
-        d = float(fname.split('/')[-1].replace('.jpg', ''))
-        frame = cv.imread(fname)
-        
+        # load model
         if ai_type == 'cls':
-            res = mmcls.apis.inference_model(model, frame, is_multi_label=True, threshold=0.01)
-            for pc, ps in zip(res['pred_class'], res['pred_score']):
-                if classes_AI[pc] != '':
-                    idx = classes_comp[classes_AI[pc]]
-                    length_AI[idx].append(d)
-                    length_AI_score[idx].append(ps)
-
+            import mmcls.apis
+            model = mmcls.apis.init_model(
+                ai_config,
+                ai_checkpoint,
+                device=device,
+            )
         elif ai_type == 'det':
-            ann = []
-            
-            try:
-                res = mmdet.apis.inference_detector(model, frame)
-            except:
-                print(fname)
-                os.system(f'rm "{fname}"')
-                continue
-            image_width = frame.shape[1]
-            image_height = frame.shape[0]
-            for ic, c in enumerate(res): # loop on classes
-                if (c[:,4] > 0.01).sum() > 0:
-
-                    degradation_name = list(classes_AI.items())[ic][1]
-                    if degradation_name != '':
-                        idx = classes_comp[degradation_name]
-            
-                        length_AI[idx].append(d)
-                        length_AI_score[idx].append(c[:,4].max()) # take highest score if several instances of same class
-
+            import mmdet.apis
+            model = mmdet.apis.init_detector(
+                ai_config,
+                ai_checkpoint,
+                device=device,
+            )
         elif ai_type == 'seg':
-            res = mmseg.apis.inference_segmentor(model, frame)[0]
-            unique_ic, unique_count = np.unique(res, return_counts=True)
-            for ic, count in zip(unique_ic, unique_count):
-                if ic == 0: # skip background
-                    continue
-                if count < 800: # keep only degradations big enough
-                    continue
-                
-                degradation_name = list(classes_AI.items())[ic-1][1] # ic-1 to ignore background
-                if degradation_name != '':
-                    idx = classes_comp[degradation_name]
-                    
-                    length_AI[idx].append(d)
-                    length_AI_score[idx].append(1) # dummy score
+            import mmseg.apis
+            model = mmseg.apis.init_segmentor(
+                ai_config,
+                ai_checkpoint,
+                device=device,
+            )
 
+        # run inference on extracted frames
+        for fname in tqdm.tqdm(extracted_frames):
+            d = float(fname.split('/')[-1].replace('.jpg', ''))
+            frame = cv.imread(fname)
+
+            if ai_type == 'cls':
+                res = mmcls.apis.inference_model(model, frame, is_multi_label=True, threshold=0.01)
+                for pc, ps in zip(res['pred_class'], res['pred_score']):
+                    if classes_AI[pc] != '':
+                        idx = classes_comp[classes_AI[pc]]
+                        length_AI[idx].append(d)
+                        length_AI_score[idx].append(ps)
+
+            elif ai_type == 'det':
+                ann = []
+
+                try:
+                    res = mmdet.apis.inference_detector(model, frame)
+                except:
+                    print(fname)
+                    os.system(f'rm "{fname}"')
+                    continue
+                image_width = frame.shape[1]
+                image_height = frame.shape[0]
+                for ic, c in enumerate(res): # loop on classes
+                    if (c[:,4] > 0.01).sum() > 0:
+
+                        degradation_name = list(classes_AI.items())[ic][1]
+                        if degradation_name != '':
+                            idx = classes_comp[degradation_name]
+
+                            length_AI[idx].append(d)
+                            length_AI_score[idx].append(c[:,4].max().item()) # take highest score if several instances of same class
+
+        outdict = {}
+        outdict['length'] = length_AI
+        outdict['score'] = length_AI_score
+        with open(outfilename, 'w') as f:
+            json.dump(outdict, f)
+    else:
+        with open(outfilename, 'r') as f:
+            indict = json.load(f)
+        length_AI = indict['length']
+        length_AI_score = indict['score']
 
     return length_AI, length_AI_score, extract_path

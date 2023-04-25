@@ -85,14 +85,16 @@ def plot_precision_recall(results, dthr, outpath):
         col = p[-1].get_color()
 
         # get max f1 score and add to plot
-        maxf1_id = np.argmax(np.array(f1_list))
-        xmax = np.array(sthr_list)[maxf1_id]
-        ymax = np.array(f1_list)[maxf1_id]
-        axf1.plot([xmax, xmax], [0, ymax], color=col, linestyle='--', linewidth=1)
-        axf1.plot([0, xmax], [ymax, ymax], color=col, linestyle='--', linewidth=1)
-        plt.text(xmax, 0, f'{xmax:.2f}', color=col, horizontalalignment='right', verticalalignment='top', rotation=45, fontsize='small')
-        plt.text(0, ymax, f'{ymax:.2f}', color=col, horizontalalignment='right', verticalalignment='center', fontsize='small')
-
+        if len(f1_list) > 0:
+            maxf1_id = np.argmax(np.array(f1_list))
+            xmax = np.array(sthr_list)[maxf1_id]
+            ymax = np.array(f1_list)[maxf1_id]
+            axf1.plot([xmax, xmax], [0, ymax], color=col, linestyle='--', linewidth=1)
+            axf1.plot([0, xmax], [ymax, ymax], color=col, linestyle='--', linewidth=1)
+            plt.text(xmax, 0, f'{xmax:.2f}', color=col, horizontalalignment='right', verticalalignment='top', rotation=45, fontsize='small')
+            plt.text(0, ymax, f'{ymax:.2f}', color=col, horizontalalignment='right', verticalalignment='center', fontsize='small')
+        else:
+            xmax, ymax = np.nan, np.nan
         max_f1_dict[cls] = ymax
         max_sthr_dict[cls] = xmax
 
@@ -147,7 +149,7 @@ def main(args):
                 print(f'\n{vid}')
                 length_AI, length_AI_score, extract_path = extract_lengths_AI(
                     f'{inputpath}/{vid}', f'{inputpath}/{vid.replace("mp4", "csv")}', classes_AI, classes_comp,
-                    args.type, args.config, args.checkpoint, args.process_every_nth_meter, filter_road=args.filter_road
+                    args.type, args.config, args.checkpoint, args.process_every_nth_meter
                 )
                 length_AI_list.append(length_AI)
                 length_AI_score_list.append(length_AI_score)
@@ -258,10 +260,10 @@ def main(args):
             # extract images and run inference
             length_AI, length_AI_score, extract_path = extract_lengths_AI(
                 args.inputvideo, args.csv, classes_AI, classes_comp,
-                args.type, args.config, args.checkpoint, args.process_every_nth_meter, filter_road=args.filter_road
+                args.type, args.config, args.checkpoint, args.process_every_nth_meter
                 )
-
-            # loop over videocoders
+            
+            # loop over videocoders            
             for jfile, videocoder in zip(args.json, args.videocoders):
                 outpath = f'{outpath_base}/{videocoder}'
                 os.makedirs(outpath, exist_ok=True)
@@ -352,7 +354,6 @@ if __name__ == '__main__':
     parser.add_argument('--threshold-dist', type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
 
-    parser.add_argument('--filter-road', action='store_true', help='Apply segmentation model to keep only road pixels on images.')
 
     # post-precessing
     parser.add_argument('--post-process', action='store_true', help='Make summary plots without processing videos again.')
