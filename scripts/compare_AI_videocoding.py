@@ -70,6 +70,12 @@ def compute_average_precision_multiref(distances_list, score, threshold_dist):
 
 
 def compute_average_recall(distance_array, score_array, dist_thr, score_thrs):
+    '''
+    Compute recall for every threshold in <score_thrs>, and corresponding average recall.
+    Inputs:
+    distance_array: (N_degradation_annot, N_ai)
+    score_array: (N_degradation_annot, N_ai)
+    '''
     if len(distance_array) == 0 or len(score_thrs) == 0:
         return np.nan, []
 
@@ -84,6 +90,86 @@ def compute_average_recall(distance_array, score_array, dist_thr, score_thrs):
 
     ar = sum(recall_list) / len(recall_list)
     return ar, recall_list
+
+
+
+def compute_average_recall_multiref(distance_array_list, score_array_list, distances_videocoders, dist_thr, score_thrs):
+    '''
+    Compute recall for every threshold in <score_thrs>, and corresponding average recal,
+    considering the combination of several videocoders as reference.
+    Inputs:
+    - distance_array_list: smallest distances between annotations of videocoders and AI detections (N_videocoders, N_degradation_annot, N_ai)
+    - score_array_list: (N_videocoders, N_degradation_annot, N_ai)
+    - distances_videocoders (list[np.array]): list of 2D arrays giving for the annotations of each videocoder the smallest distance to an annotation 
+    of every other videocoder(N_videocoder, (N_videocoder-1, N_degradations))     
+    '''
+#    if len(distance_array) == 0 or len(score_thrs) == 0:
+#        return np.nan, []
+
+    # for every annotations of a given videocoder, get number of agreeing videocoders
+    N_vid_agree_list = []
+    for dist in distances_videocoders:
+        N_vid_agree = (dist < dist_thr).sum(axis=0)
+        N_vid_agree_list.append(N_vid_agree+1)
+
+    # loop in score thresholds, at each iteration compute number of FN
+    recall_list = []
+    for score_thr in score_thrs:
+        # loop over videocoders
+        TP_count_tot = 0
+        TP_FN_count_tot = 0 # TP+FN
+        for distance_array, score_array, N_vid_agree in zip(distance_array_list, score_array_list, N_vid_agree_list):
+            # consider only annotations with at least 2 agreeing videocoders
+            distance_array = distance_array[N_vid_agree>1]
+            score_array = score_array[N_vid_agree>1]
+            
+            masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
+            distance_thresholded = np.where(masked_distance<dist_thr, 1, 0) # replace distances below dist thr by 1, other by 0
+            TP_count = distance_thresholded.sum(axis=1) # count of AI detection within detection threshold of each annotated degradation
+            TP_count_tot += (TP_count > 0).sum()
+            TP_FN_count_tot += len(TP_count)
+            
+        recall = TP_count_tot / TP_FN_count_tot # TP / (TP+FN)
+        recall_list.append(recall)
+
+    ar = sum(recall_list) / len(recall_list)
+    return ar, recall_list
+
+
+
+def compute_distances_videocoders(length_video_list_videocoders, cls_index):
+    '''
+    Compute distances between one videocoder and all the others.
+    Inputs:
+    - length_video_list_videocoders: list of annotations for each class, video, and videocoder. Dimensions = (N_videocoders, N_videos, N_classes, N_degradations).
+    - cls_index: index of consodered class.
+    Returns:
+    - distances_videocoders (list[np.array]): list of 2D arrays giving for the annotations of each videocoder the smallest distance to an annotation 
+    of every other videocoder(N_videocoder, (N_videocoder-1, N_degradations))
+    '''
+
+    distances_videocoders = []
+    
+    # loop over videocoders
+    for videocoder_comp_id, length_video_list_comp in enumerate(length_video_list_videocoders):
+        length_video_list_videocoders_ref = length_video_list_videocoders[:videocoder_comp_id] + length_video_list_videocoders[videocoder_comp_id+1:]
+        # compare videocoder_comp to all the others
+        # loop over reference videocoders
+        distances_videocoder_comp = []
+        for length_video_list_ref in length_video_list_videocoders_ref:
+            # loop over videos
+            distances = []
+            for iv, length_video in enumerate(length_video_list_ref):
+                lv_comp = length_video_list_comp[iv][cls_index]
+                lv_ref = length_video[cls_index]
+
+                distances += compute_smallest_distances(lv_comp, lv_ref).tolist()
+
+            distances_videocoder_comp.append( distances )
+
+        distances_videocoders.append( np.stack(distances_videocoder_comp) )
+
+    return distances_videocoders
 
         
 
@@ -216,8 +302,8 @@ def main(args):
 
         distances_AI_videocoders_list = [[] for _ in range(len(classes_comp))] # for AP combining all videocoders (N_classes, N_videocoders, N_detections)
         AI_scores = [] # for AP combining all videocoders (N_classes, N_detections)
-        distances_array_videocoders_list = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_degradation_annot)
-        AI_scores_array = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_detections)
+        distances_array_videocoders_list = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_degradation_annot, N_ai)
+        AI_scores_array = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_detections, N_ai)
 
         for iv, (length_video_list, videocoder) in enumerate(zip(length_video_list_videocoders, args.videocoders)):
             outpath = f'{outpath_base}/{videocoder}'
@@ -303,10 +389,17 @@ def main(args):
             max_f1 = max_f1_dict[cls]
             print(f'{cls: <30}{max_sthr: ^10.2f}{dthr_dict["ap"]: ^10.3f}{dthr_dict["ar"]: ^10.3f}{max_f1: ^10.3f}')
 
+    # AP and AR for combination of videocoders 
     for ic, cls in enumerate(classes_comp):
-        ap, _,_ = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], int(distance_thr.replace('m','')))
-        print(cls[0], ap)
+        # AP
+        ap, precision_list, score_thrs = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], int(distance_thr.replace('m','')))
 
+        # AR
+        distances_videocoders = compute_distances_videocoders(length_video_list_videocoders, ic)
+        ar, recall_list = compute_average_recall_multiref(distances_array_videocoders_list[ic], AI_scores_array[ic], distances_videocoders, int(distance_thr.replace('m','')), score_thrs)
+
+        print(cls[0], ap, ar)
+        
 
             
 if __name__ == '__main__':
