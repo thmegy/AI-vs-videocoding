@@ -54,15 +54,17 @@ def compute_average_precision_multiref(distances_list, score, threshold_dist):
     
     # count true positive examples
     pos_inds = sort_det > 1
-    tp = np.cumsum(pos_inds)
-    total_pos = tp[-1]
+    pos_weighted = np.where(pos_inds, sort_det, 0) # weight by number of agreeing videocoders
+    tp = np.cumsum(pos_weighted)
+    total_pos = pos_inds.sum() # number of considered score thresholds
     
-    # count not difficult examples
-    pn_inds = sort_det != -1
-    pn = np.cumsum(pn_inds)
+    # count total examples
+    N_videocoders = distances_list.shape[0]
+    tot_weighted = np.where(pos_weighted==0, N_videocoders-sort_det , pos_weighted)
+    tot = np.cumsum(tot_weighted)
 
     tp[np.logical_not(pos_inds)] = 0
-    precision = tp / pn
+    precision = tp / tot
     ap = np.sum(precision) / total_pos
 
     return ap, precision[pos_inds], score[sort_inds][pos_inds], # AP, [precision_array], [score of true positives]
@@ -242,8 +244,6 @@ def main(args):
     classes_AI = cls_config['classes_AI']
     classes_comp= cls_config['classes_comp']
         
-    results = {}
-
     # number of detection to keep for average recall calculation =
     # number of frames in interval given by +-
     # the largest distance threshold considered (detections beyand are necessarily FN)
@@ -306,6 +306,8 @@ def main(args):
         AI_scores_array = [[] for _ in range(len(classes_comp))] # for AR combining all videocoders (N_classes, N_videocoders, N_detections, N_ai)
 
         for iv, (length_video_list, videocoder) in enumerate(zip(length_video_list_videocoders, args.videocoders)):
+            results = {}
+
             outpath = f'{outpath_base}/{videocoder}'
             os.makedirs(outpath, exist_ok=True)
 
@@ -366,11 +368,46 @@ def main(args):
             with open(f'{outpath}/results.json', 'w') as fout:
                 json.dump(results, fout, indent = 6)
 
+                
+        # AP and AR for combination of videocoders 
+        outpath = f'{outpath_base}/Combination'
+        os.makedirs(outpath, exist_ok=True)
+
+        results = {}
+
+        for ic, cls in enumerate(classes_comp):
+            class_name = list(classes_comp.keys())[ic]
+
+            distances_videocoders = compute_distances_videocoders(length_video_list_videocoders, ic) # for AR
+
+            ap_dict = {}
+            ar_dict = {}
+            precision_recall_dict = {}
+            for dthr in args.threshold_dist:
+                ap, precision_list, tp_scores = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], dthr)
+                ap_dict[f'{int(dthr)}m'] = ap
+
+                ar, recall_list = compute_average_recall_multiref(distances_array_videocoders_list[ic], AI_scores_array[ic], distances_videocoders, dthr, tp_scores)
+                ar_dict[f'{int(dthr)}m'] = ar
+
+                precision_recall_dict[f'{int(dthr)}m'] = {'ap':ap, 'ar':ar}
+                for p, r, s in zip(precision_list, recall_list, tp_scores):
+                    precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
+
+            results[class_name] = precision_recall_dict
+
+        print(results.keys())
+            
+        with open(f'{outpath}/results.json', 'w') as fout:
+            json.dump(results, fout, indent = 6)
+            
+
+
                                 
     ######### post-processing ##############
     distance_thr = '10m' # threshold used to extract single summary figures
 
-    for videocoder in args.videocoders:
+    for videocoder in args.videocoders + ['Combination']:
         print(f'\n\n{videocoder}\n')
         outpath = f'{outpath_base}/{videocoder}'
         with open(f'{outpath}/results.json', 'r') as f:
@@ -389,16 +426,6 @@ def main(args):
             max_f1 = max_f1_dict[cls]
             print(f'{cls: <30}{max_sthr: ^10.2f}{dthr_dict["ap"]: ^10.3f}{dthr_dict["ar"]: ^10.3f}{max_f1: ^10.3f}')
 
-    # AP and AR for combination of videocoders 
-    for ic, cls in enumerate(classes_comp):
-        # AP
-        ap, precision_list, score_thrs = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], int(distance_thr.replace('m','')))
-
-        # AR
-        distances_videocoders = compute_distances_videocoders(length_video_list_videocoders, ic)
-        ar, recall_list = compute_average_recall_multiref(distances_array_videocoders_list[ic], AI_scores_array[ic], distances_videocoders, int(distance_thr.replace('m','')), score_thrs)
-
-        print(cls[0], ap, ar)
         
 
             
@@ -416,7 +443,7 @@ if __name__ == '__main__':
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     
-    parser.add_argument('--threshold-dist', type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+    parser.add_argument('--threshold-dist', type=float, nargs='*', default=[6, 8, 10, 12, 14, 16, 18, 20],
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
 
 
