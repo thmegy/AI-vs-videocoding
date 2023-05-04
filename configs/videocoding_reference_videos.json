@@ -76,4 +76,20 @@
 	'Vannes_logiroad_2_20220124_094528_789.mp4' : 'releve_lot_Comparaison_IA_20220609_111900_PC-STOCCO_AV_Vannes_logiroad_2_20220124_094528_789.json',
 	'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_Comparaison_IA_20220609_115026_PC-STOCCO_AV_Vannes_logiroad_2_20220124_165314_007.json',
     }
+    json_dict_Olivier_2 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'releve_lot_Olivier_S_IA_20230420_143407_PC-STOCCO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'releve_lot_Olivier_S_IA_20230420_165239_PC-STOCCO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'releve_lot_Olivier_S_IA_20230424_091521_PC-STOCCO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+	'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'releve_lot_Olivier_S_IA_20230424_092446_PC-STOCCO_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
+	'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'releve_lot_Olivier_S_IA_20230424_102618_PC-STOCCO_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
+	'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'releve_lot_Olivier_S_IA_20230424_111526_PC-STOCCO_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
+	'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'releve_lot_Olivier_S_IA_20230426_143013_PC-STOCCO_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
+	'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'releve_lot_Olivier_S_IA_20230426_162738_PC-STOCCO_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
+	'Douarnenez_AV_Logiroad_AV_20220317_172419_603.mp4' : 'releve_lot_Olivier_S_IA_20230426_164500_PC-STOCCO_AV_Douarnenez_AV_Logiroad_AV_20220317_172419_603.json',
+	//'no_contract_CD 33_20210309_101639_889.mp4' : 'releve_lot_Olivier_S_IA_20230424_151510_PC-STOCCO_AV_no_contract_CD_33_20210309_101639_889.json',
+	'no_contract_CD 33_20210311_111829_045.mp4' : 'releve_lot_Olivier_S_IA_20230424_164131_PC-STOCCO_AV_no_contract_CD_33_20210311_111829_045.json',
+	'no_contract_CD 33_20210420_164326_010.mp4' : 'releve_lot_Olivier_S_IA_20230426_111639_PC-STOCCO_AV_no_contract_CD_33_20210420_164326_010.json',
+	'Vannes_logiroad_2_20220124_094528_789.mp4' : 'releve_lot_Olivier_S_IA_20230426_173112_PC-STOCCO_AV_Vannes_logiroad_2_20220124_094528_789.json',
+	'Vannes_logiroad_2_20220124_165314_007.mp4' : 'releve_lot_Olivier_S_IA_20230426_181734_PC-STOCCO_AV_Vannes_logiroad_2_20220124_165314_007.json',
+    }
 }

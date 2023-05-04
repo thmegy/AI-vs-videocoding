@@ -432,7 +432,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier', 'Olivier_2'], help='name of videocoders we compare AI to.')
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     
     # args for AI
