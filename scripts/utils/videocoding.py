@@ -339,7 +339,8 @@ def extract_lengths_AI(videopath, geoptis_csvpath, classes_AI, classes_comp, ai_
         length_AI_score = [[] for _ in range(len(classes_comp))] # score associated to prediction
 
         cam = cv.VideoCapture(videopath)
-
+        framerate = cam.get(cv.CAP_PROP_FPS)
+        
         if not os.path.isdir(extract_path):
             os.makedirs(extract_path)
             # loop over video

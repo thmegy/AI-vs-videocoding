@@ -14,7 +14,7 @@ import mmcv
 from mmdet.utils import select_images
 import torch
 
-from utils import extract_lengths, writejson, compute_smallest_distances
+from utils import extract_lengths_AI, extract_lengths_videocoding, writejson, compute_smallest_distances
 
 
 def revert_dict(FP_dict, FN_dict, im_list):
@@ -75,7 +75,7 @@ def main(args):
     input_vid_list = input_vid_list_tmp
 
     # select randomly 8 videos to process
-    idx_list = random.sample(range(len(input_vid_list)), 8)
+    idx_list = random.sample(range(len(input_vid_list)), 1)
     vid_list = []
     json_list = []
     for idx in idx_list:
@@ -101,11 +101,15 @@ def main(args):
         print(jjson)
         disagreement_dict = {'FP':{}, 'FN':{}}
 
-        length_AI, length_AI_score, length_video, extract_path = extract_lengths(
-            jjson, vid, vid.replace('mp4', 'csv'),
-            classes_vid, classes_AI, classes_comp,
-            'det', args.config, args.checkpoint, args.process_every_nth_meter,
-            filter_road=False, device=device
+        length_AI, length_AI_score, extract_path = extract_lengths_AI(
+            vid, vid.replace('mp4', 'csv'), classes_AI, classes_comp,
+            'det', args.config, args.checkpoint, args.process_every_nth_meter
+        )
+
+
+        length_video = extract_lengths_videocoding(
+            jjson, vid.replace('mp4', 'csv'),
+            classes_vid, classes_comp, args.process_every_nth_meter
         )
 
         # loop over classes
