@@ -74,5 +74,34 @@
 	'Autre_reparation' : 2,
 	'Pontage' : 3,
     }
+
+
+    // score thresholds for each AI class
+    classes_AI_thr : {
+	'Arrachement_pelade' : 0.26,
+	'Faiencage' : 0.33,
+	'Nid_de_poule' : 0.45,
+	'Transversale' : 0.36,
+	'Longitudinale' : 0.47,
+	'Pontage_de_fissures' : 0.44,
+	'Remblaiement_de_tranchees' : 0.27,
+	'Raccord_de_chaussee' : 0.3,
+	'Comblage_de_trou_ou_Projection_d_enrobe' : 0.3,
+	'Bouche_a_clef' : 0.3,
+	'Grille_avaloir' : 0.3,
+	'Regard_tampon' : 0.3
+    }
+    
+    // score thresholds for each comp class
+    classes_comp_thr : {
+	'Arrachement_pelade' : 0.26,
+	'Faiencage' : 0.33,
+	'Nid_de_poule' : 0.45,
+	'Transversale' : 0.36,
+	'Longitudinale' : 0.47,
+	'Pontage' : 0.44,
+	'Remblaiement_de_tranchees' : 0.27,
+	'Autre_reparation' : 0.3,
+    }
     
 }

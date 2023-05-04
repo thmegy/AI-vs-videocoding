@@ -93,7 +93,9 @@ def main(args):
     cls_config =  hjson.load(open(args.cls_config, 'r'))
     classes_vid = cls_config['classes_vid']
     classes_AI = cls_config['classes_AI']
-    classes_comp= cls_config['classes_comp']
+    classes_AI_thr = cls_config['classes_AI_thr']
+    classes_comp = cls_config['classes_comp']
+    classes_comp_thr = cls_config['classes_comp_thr']
     cls_weight = cls_config['cls_weight']
     
     for vid, jjson in zip(vid_list, json_list):
@@ -118,7 +120,7 @@ def main(args):
             
             lai = np.array(lai)
             score = np.array(score)
-            lai_thr = lai[score > args.threshold_score]  # apply threshold to length_AI
+            lai_thr = lai[score > classes_comp_thr[class_name]]  # apply threshold to length_AI
 
             distances_AI = compute_smallest_distances(lai_thr, lv)
             distances_video = compute_smallest_distances(lv, lai_thr)
@@ -240,10 +242,11 @@ def main(args):
         image_width = image.shape[1]
         image_height = image.shape[0]
         for ic, c in enumerate(res): # loop on classes
+            score_thr = list(classes_AI_thr.values())[ic]
             for ip, p in enumerate(c): # loop on bboxes
                 x1, y1, x2, y2 = p[:4]
                 x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-                if p[4] > 0.3:
+                if p[4] > score_thr:
                     ann.append(f'{ic} {(x1+x2)/2/image_width} {(y1+y2)/2/image_height} {(x2-x1)/image_width} {(y2-y1)/image_height}')
                         
         ann_name = im_name_new.replace('.jpg', '.txt')
@@ -266,7 +269,6 @@ if __name__ == '__main__':
     
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     parser.add_argument('--threshold-dist', type=float, default=10, help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
-    parser.add_argument('--threshold-score', type=float, default=0.3, help='score threshold to be used for disagreement extraction.')
     parser.add_argument('--n-sel-al', type=float, default=1000, help='Number of frames to select with Active Learning for annotation.')
 
     parser.add_argument('--gpu-id', type=int, default=0)
