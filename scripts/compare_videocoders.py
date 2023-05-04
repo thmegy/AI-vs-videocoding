@@ -10,6 +10,7 @@ import pandas as pd
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import krippendorff
 
 from utils import extract_lengths_videocoding, compute_smallest_distances
 
@@ -119,7 +120,7 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
     Plot, for all reference videos, whether a degradation has been annotated or not by each videocoder.
     '''
     cmap_binary = mpl.colors.ListedColormap(['red', 'green'])
-    cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue'])
+    cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue', 'purple'])
 
     fig = plt.figure(figsize=(34,9))
     subfigs_cbar = fig.subfigures(nrows=1, ncols=2, width_ratios=(10,1))
@@ -133,7 +134,7 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
         ax[0].set_yticklabels(videocoders)
         ax[0].set_title(vid, fontsize='small')
 
-        psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=5)
+        psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=6)
         ax[1].set_yticks([])
         ax[1].set_yticklabels([])
         ax[1].set_xlabel('distance [m]')
@@ -263,6 +264,7 @@ def main(args):
     max_distance_list = [int(m)+1 for m in max_distance_list] # only integers
     
     # loop over classes
+    print('\nKrippendorff\'s alpha')
     for ic in range(len(classes_comp)):
         class_name = list(classes_comp.keys())[ic]
         
@@ -286,11 +288,14 @@ def main(args):
             presence_array_list.append(presence_array)
 
         plot_timeline_grouped(presence_array_list, args.videocoders, class_name, video_list, f'results_comparison/videocoders/{class_name}_timeline.png')
+        
+        presence_array_tot = np.concatenate(presence_array_list, axis=1).astype('str')
+        print(f'{class_name : <30} {krippendorff.alpha(reliability_data=presence_array_tot, level_of_measurement="nominal"):^10.3f}')
 
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier', 'Olivier_2'], help='name of videocoders we compare AI to.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     
