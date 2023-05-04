@@ -193,7 +193,7 @@ def shift_timestamps_wrt_gps(geoptis_csvpath, timestamps, length_meters):
     # Make sure that we're in between interpolation bounds. It should be ok
     # since it's only the few first and last frames ?
     timestamps = np.clip(timestamps, a_min=traj_times[0], a_max=traj_times[-1])
-
+    
     print(traj_times[0])
     distances_at_t = distance_for_timestamp(timestamps)
     shifted_distances = distances_at_t - length_meters

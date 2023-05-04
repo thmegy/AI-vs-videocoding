@@ -189,8 +189,8 @@ def main(args):
             weight += cls_weight[cls]
         try:
             uncertainty.append( mmdet.apis.inference_detector(model, im, active_learning=True)*weight )
-        except:
-            print(im)
+        except Exception as e:
+            print(e, im)
             uncertainty.append(torch.tensor([0], device=device))
 
     uncertainty = torch.concat(uncertainty)
