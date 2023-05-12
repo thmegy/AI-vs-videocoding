@@ -11,6 +11,7 @@ import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 import krippendorff
+import subprocess
 
 from utils import extract_lengths_videocoding, compute_smallest_distances
 
@@ -159,6 +160,8 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
         
     
 def main(args):
+    outpath_base = f'results_comparison/videocoders/{args.videocoding_config.replace(".json", "").split("/")[-1]}'
+
     # load dicts with classes in json and classes used for comparaison
     cls_config =  hjson.load(open(args.cls_config, 'r'))
     classes_vid = cls_config['classes_vid']
@@ -197,9 +200,9 @@ def main(args):
     for comb in combinations:
         videocoder_1, videocoder_2 = sorted(list(comb))
         length_video_list_1, length_video_list_2 = length_video_dict[videocoder_1], length_video_dict[videocoder_2]
-        print(f'\n\n{videocoder_1}_vs_{videocoder_2}\n')
-        print(f'{"class" : <30}{"F1_score": ^10}')
-        outpath = f'results_comparison/videocoders/{videocoder_1}_vs_{videocoder_2}'
+        print(f'\nRunning comparison for {videocoder_1}_vs_{videocoder_2}')
+#        print(f'{"class" : <30}{"F1_score": ^10}')
+        outpath = f'{outpath_base}/{videocoder_1}_vs_{videocoder_2}'
         os.makedirs(outpath, exist_ok=True)
     
         results = {'recall':{}, 'precision':{}, 'f1_score':{}}
@@ -245,7 +248,7 @@ def main(args):
             results['f1_score'][class_name] = f1_dict
 
             distance_thr = '10m' # threshold used to extract single summary figures
-            print(f'{class_name : <30} {results["f1_score"][class_name][distance_thr]:^10.3f}')
+#            print(f'{class_name : <30} {results["f1_score"][class_name][distance_thr]:^10.3f}')
 
             plot_evolution(results, 'precision', 'Precision', outpath)
             plot_evolution(results, 'recall', 'Recall', outpath)
@@ -256,7 +259,9 @@ def main(args):
 
 
                 
-    # make timeline of agreement between all videocoders
+    ##### make timeline of agreement between all videocoders and use it to compute agreement metrics and annotator competence #####
+    os.makedirs(f'{outpath_base}/MACE_inputs', exist_ok=True)
+
     assert args.process_every_nth_meter==1, '--process-every-nth-meter needs to be 1m for timeline plots !'
     distance_threshold = 10
     length_video_list_videocoders = [l for l in length_video_dict.values()]
@@ -264,6 +269,8 @@ def main(args):
     max_distance_list = [int(m)+1 for m in max_distance_list] # only integers
     
     # loop over classes
+    mace_competence_array = []
+    k_alpha_list = []
     print('\nKrippendorff\'s alpha')
     for ic in range(len(classes_comp)):
         class_name = list(classes_comp.keys())[ic]
@@ -287,11 +294,38 @@ def main(args):
             #plot_timeline(presence_array, args.videocoders, class_name, f'results_comparison/videocoders/{video.replace(".mp4", "")}_{class_name}_timeline.png')
             presence_array_list.append(presence_array)
 
-        plot_timeline_grouped(presence_array_list, args.videocoders, class_name, video_list, f'results_comparison/videocoders/{class_name}_timeline.png')
-        
-        presence_array_tot = np.concatenate(presence_array_list, axis=1).astype('str')
-        print(f'{class_name : <30} {krippendorff.alpha(reliability_data=presence_array_tot, level_of_measurement="nominal"):^10.3f}')
+        plot_timeline_grouped(presence_array_list, args.videocoders, class_name, video_list, f'{outpath_base}/{class_name}_timeline.png')
 
+        # evaluate annotator competence with MACE and inter-annotator agreement with krippendorff's alpha
+        presence_array_tot = np.concatenate(presence_array_list, axis=1)
+        k_alpha = krippendorff.alpha(reliability_data=presence_array_tot.astype("str"), level_of_measurement="nominal")
+        k_alpha_list.append(k_alpha)
+        print(f'{class_name : <30} {k_alpha:^10.3f}')
+
+        np.savetxt(f'{outpath_base}/MACE_inputs/{class_name}.csv', presence_array_tot.T, fmt='%i', delimiter=',')
+        with open(f'{outpath_base}/MACE_inputs/{class_name}_count.tsv', 'w') as fprior: # save counts of 0s and 1s to be used as priors in MACE
+            idx, count = np.unique(presence_array_tot, return_counts=True)
+            for i, c in zip(idx, count):
+                fprior.write(f'{int(i)}\t{c}\n')
+        subprocess.run(
+            f'./MACE/MACE --prefix MACE/results/{class_name} --priors {outpath_base}/MACE_inputs/{class_name}_count.tsv {outpath_base}/MACE_inputs/{class_name}.csv',
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        mace_competence_array.append(np.loadtxt(f'MACE/results/{class_name}.competence'))
+
+    # print competence of videocoders for each class
+    mace_competence_array = np.stack(mace_competence_array).T
+    cls_str = ' '.join([f' {c[:15]:^15}' for c in classes_comp.keys()])
+    print(f'{"videocoder" : <10} {cls_str} {"Average Competence":^15}')
+    for videocoder, comp in zip(args.videocoders, mace_competence_array):
+        comp_str = ' '.join([f' {c:^15.2f}' for c in comp])
+        print(f'{videocoder : <10} {comp_str} {comp.mean():^15.2f}')
+
+    np.savetxt(f'{outpath_base}/MACE_competence.txt', mace_competence_array, header=f'rows: {", ".join(classes_comp.keys())}\n columns: {", ".join(args.videocoders)}', fmt='%.3f')
+    np.savetxt(f'{outpath_base}/k_alpha.txt', k_alpha_list, header=f'rows: {", ".join(classes_comp.keys())}', fmt='%.3f')
+        
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
