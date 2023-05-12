@@ -120,8 +120,7 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
     '''
     Plot, for all reference videos, whether a degradation has been annotated or not by each videocoder.
     '''
-    cmap_binary = mpl.colors.ListedColormap(['red', 'green'])
-    cmap = mpl.colors.ListedColormap(['red', 'orange', 'yellow', 'green', 'blue', 'purple'])
+    cmap_binary = mpl.colors.ListedColormap(['white', 'black'])
 
     fig = plt.figure(figsize=(34,9))
     subfigs_cbar = fig.subfigures(nrows=1, ncols=2, width_ratios=(10,1))
@@ -135,25 +134,89 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
         ax[0].set_yticklabels(videocoders)
         ax[0].set_title(vid, fontsize='small')
 
-        psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=6)
+        # plot size of majority. Example for 5 videocoder: if sum={5,0} --> majority=5  ; sum={4,1} --> majority=4  ;   sum={3,2} --> majority=3
+        presence_sum = presence_array.sum(axis=0)
+        majority = np.abs(presence_sum - len(videocoders)/2) + len(videocoders)/2
+        vmin = len(videocoders)/2 if len(videocoders)%2==0 else len(videocoders)//2 + 1
+        psum = ax[1].imshow(majority.reshape(1,-1), aspect='auto', interpolation='none', cmap='RdYlGn', vmin=vmin, vmax=len(videocoders))
         ax[1].set_yticks([])
         ax[1].set_yticklabels([])
         ax[1].set_xlabel('distance [m]')
 
+        # add hatches if sum == 0 , i.e. no annotations
+        x_hatches = np.where(presence_sum==0)[0]
+        x_edges_id = np.where(np.diff(x_hatches)>1)[0]
+        x_edges_id = np.sort(np.concatenate([x_edges_id, x_edges_id+1]))
+        x_edges = x_hatches[x_edges_id]
+
+        if len(x_hatches>0):
+            if len(x_edges>0):
+                x_edges = np.insert(x_edges, 0, x_hatches[0])  # add start of first rectangle
+                x_edges = np.append(x_edges, x_hatches[-1]) # add end of last rectangle
+            else:
+                x_edges = np.array([x_hatches[0], x_hatches[-1]]) # full size corresponds to zone with sum==0
+            
+            x_edges = x_edges.reshape(-1,2)
+            
+        for x1, x2 in x_edges:
+            ax[1].add_patch( mpl.patches.Rectangle((x1,-1), x2-x1+1, 2, hatch='//', fill=False) )
+
 
     ax = subfigs_cbar[1].subplots()
     ax.axis('off')
-    cax = subfigs_cbar[1].add_axes([0.6, 0.1, 0.2, 0.8])
-    cbar = subfigs_cbar[1].colorbar(psum, cax=cax, ticks=[0.5, 1.5, 2.5, 3.5, 4.5])
-    cbar.ax.set_yticklabels(['0','1','2','3','4'])
-    cbar.set_label(f'Somme')
+    cax = subfigs_cbar[1].add_axes([0.6, 0.2, 0.2, 0.7])
+    cbar = subfigs_cbar[1].colorbar(psum, cax=cax, ticks=np.arange(vmin, len(videocoders)+1, 1))
+    cbar.ax.set_yticklabels(np.arange(vmin, len(videocoders)+1, 1).astype('str'))
+    cbar.set_label('$N_{accord}$')
 
-    cax_binary = subfigs_cbar[1].add_axes([0.2, 0.1, 0.2, 0.8])
+    cax_binary = subfigs_cbar[1].add_axes([0.2, 0.2, 0.2, 0.7])
     cbar_binary = subfigs_cbar[1].colorbar(praw, cax=cax_binary, ticks=[0.5, 1.5])
     cbar_binary.ax.set_yticklabels(['0','1'])
     cbar_binary.set_label(f'Présence {class_name}')
-    
+
+    cax_hatch = subfigs_cbar[1].add_axes([0.2, 0.1, 0.8, 0.1])
+    cax_hatch.axis('off')
+    cax_hatch.add_patch( mpl.patches.Rectangle((0,0.1), 0.1, 0.5, hatch='//', fill=False) )
+    cax_hatch.text(0.15, 0.35, 'Aucune Dégradation relevée',
+                   ha="left", va="center", color="black")
+
     fig.savefig(outname)
+    plt.close('all')
+
+
+
+def plot_competence(matrix, videocoders, classes, outname):
+    '''
+    Plot matrix of annotator competence for each class of degradation, as estimated with MACE.
+    '''    
+    fig, ax = plt.subplots(1, 2, sharey=True, gridspec_kw={'width_ratios':(8,1), 'wspace':0.05}, figsize=(len(classes)*2, len(videocoders)*1.7))
+    opts = {'cmap': 'RdYlGn', 'vmin': 0, 'vmax': +1}
+
+    ax[0].pcolor(matrix, **opts)
+    for irow in range(matrix.shape[0]):
+        for icol in range(matrix.shape[1]):
+            ax[0].text(icol+0.5, irow+0.5, '{:.3f}'.format(matrix[irow][icol]),
+                       ha="center", va="center", color="black")
+
+    ax[0].set_yticks(np.arange(0.5, matrix.shape[0], 1))
+    ax[0].set_yticklabels(videocoders)
+    ax[0].set_xticks(np.arange(0.5, matrix.shape[1], 1))
+    ax[0].set_xticklabels(classes, rotation=45, ha='right')
+
+    # compute mean competence of each videocoder and add to matrix plot
+    mean_competence = matrix.mean(axis=1).reshape(-1, 1)
+    heatmap = ax[1].pcolor(mean_competence, **opts)
+    for irow in range(mean_competence.shape[0]):
+        for icol in range(mean_competence.shape[1]):
+            ax[1].text(icol+0.5, irow+0.5, '{:.3f}'.format(mean_competence[irow][icol]),
+                       ha="center", va="center", color="black")
+
+    ax[1].set_xticks([0.5])
+    ax[1].set_xticklabels(['Moyenne'], rotation=45, ha='right')
+
+    fig.colorbar(heatmap, ax=ax.ravel().tolist())
+
+    fig.savefig(outname, bbox_inches='tight')
     plt.close('all')
     
                 
@@ -325,7 +388,10 @@ def main(args):
 
     np.savetxt(f'{outpath_base}/MACE_competence.txt', mace_competence_array, header=f'rows: {", ".join(classes_comp.keys())}\n columns: {", ".join(args.videocoders)}', fmt='%.3f')
     np.savetxt(f'{outpath_base}/k_alpha.txt', k_alpha_list, header=f'rows: {", ".join(classes_comp.keys())}', fmt='%.3f')
-        
+
+    plot_competence(mace_competence_array, args.videocoders, classes_comp.keys(), f'{outpath_base}/MACE_competence.png')
+
+    
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
