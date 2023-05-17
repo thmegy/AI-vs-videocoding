@@ -1,0 +1,49 @@
+{
+    // dict with pre-defined videos and their corresponding json
+    inputpath : 'data/reference_videos/'
+    json_dict_1a : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Nestor/releve_lot_Comparaison_IA_20220606_101729_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Nestor/releve_lot_Comparaison_IA_20220608_154238_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Nestor/releve_lot_Comparaison_IA_20220611_132026_LAPTOP-HO492LF6_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_1b : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Nestor_2/releve_lot_Comparaison__nestor_20230330_151012_NESTOR-KOUAME_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Nestor_2/releve_lot_Comparaison__nestor_20230330_154237_NESTOR-KOUAME_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Nestor_2/releve_lot_Comparaison__nestor_20230330_165047_NESTOR-KOUAME_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_2 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Jean_marc/releve_lot_Comparaison_Jean-marc_20230330_150315_JEAN-MARC_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Jean_marc/releve_lot_Comparaison_Jean-marc_20230330_154430_JEAN-MARC_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Jean_marc/releve_lot_Comparaison_Jean-marc_20230330_165638_JEAN-MARC_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_3 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Peggy/releve_lot_COMPARAISON_PEGGY_20230330_152727_DESKTOP-3G3T9D2_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Peggy/releve_lot_COMPARAISON_PEGGY_20230330_155523_DESKTOP-3G3T9D2_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Peggy/releve_lot_COMPARAISON_PEGGY_20230330_165048_DESKTOP-3G3T9D2_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_4 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Bruno/releve_lot_IA_COMPARAISON_20230330_151814_BRUNO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Bruno/releve_lot_IA_COMPARAISON_20230330_152139_BRUNO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Bruno/releve_lot_IA_COMPARAISON_20230330_165116_BRUNO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_5 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Gaetan/releve_lot_DEGRADATION_IA_20220513_075518_PC-GAETAN_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Gaetan/releve_lot_DEGRADATION_IA_20220513_080725_PC-GAETAN_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Gaetan/releve_lot_DEGRADATION_IA_20220516_080820_PC-GAETAN_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_6 : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Leo/releve_lot_IA_20220509_095322_MSI-LEO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Leo/releve_lot_IA_20220510_083631_MSI-LEO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Leo/releve_lot_IA_20220510_090913_MSI-LEO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_7a : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Olivier/releve_lot_Comparaison_IA_20220607_155526_PC-STOCCO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Olivier/releve_lot_Comparaison_IA_20220607_163401_PC-STOCCO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Olivier/releve_lot_Comparaison_IA_20220607_172854_PC-STOCCO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+    json_dict_7b : {
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230420_143407_PC-STOCCO_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230420_165239_PC-STOCCO_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230424_091521_PC-STOCCO_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+    }
+}

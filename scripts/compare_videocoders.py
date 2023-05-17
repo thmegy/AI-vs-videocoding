@@ -97,6 +97,7 @@ def plot_timeline(presence_array, videocoders, class_name, outname):
     praw = ax[0].imshow(presence_array, aspect='auto', interpolation='none', cmap=cmap_binary, vmin=0, vmax=2)
     ax[0].set_yticks(np.arange(len(videocoders)))
     ax[0].set_yticklabels(videocoders)
+    ax[0].set_ylabel('vidéocodeurs')
 
     psum = ax[1].imshow(presence_array.sum(axis=0).reshape(1,-1), aspect='auto', interpolation='none', cmap=cmap, vmin=0, vmax=5)
     ax[1].set_yticks([0.])
@@ -133,6 +134,7 @@ def plot_timeline_grouped(presence_array_list, videocoders, class_name, video_li
         ax[0].set_yticks(np.arange(len(videocoders)))
         ax[0].set_yticklabels(videocoders)
         ax[0].set_title(vid, fontsize='small')
+        ax[0].set_ylabel('vidéocodeurs')
 
         # plot size of majority. Example for 5 videocoder: if sum={5,0} --> majority=5  ; sum={4,1} --> majority=4  ;   sum={3,2} --> majority=3
         presence_sum = presence_array.sum(axis=0)
@@ -200,6 +202,7 @@ def plot_competence(matrix, videocoders, classes, outname):
 
     ax[0].set_yticks(np.arange(0.5, matrix.shape[0], 1))
     ax[0].set_yticklabels(videocoders)
+    ax[0].set_ylabel('vidéocodeurs')
     ax[0].set_xticks(np.arange(0.5, matrix.shape[1], 1))
     ax[0].set_xticklabels(classes, rotation=45, ha='right')
 
@@ -372,6 +375,7 @@ def main(args):
                 fprior.write(f'{int(i)}\t{c}\n')
         subprocess.run(
             f'./MACE/MACE --prefix MACE/results/{class_name} --priors {outpath_base}/MACE_inputs/{class_name}_count.tsv {outpath_base}/MACE_inputs/{class_name}.csv',
+#            f'./MACE/MACE --prefix MACE/results/{class_name} {outpath_base}/MACE_inputs/{class_name}.csv',
             shell=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL
@@ -395,7 +399,7 @@ def main(args):
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--videocoders', nargs='*', type=str, default=['Gaetan', 'Leo', 'Nestor', 'Olivier', 'Olivier_2'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['1','2','3','4a','4b'], help='name of videocoders we compare AI to.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     
