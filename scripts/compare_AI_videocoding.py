@@ -3,6 +3,7 @@ import json, hjson
 import os
 import re
 import glob
+import sys
 
 import cv2 as cv
 import numpy as np
@@ -51,9 +52,10 @@ def compute_average_precision_multiref(distances_list, score, threshold_dist):
     # sort examples
     sort_inds = np.argsort(-score)
     sort_det = N_vid_agree[sort_inds]
-    
+
+    sorted_score = score[sort_inds]
     # count true positive examples
-    pos_inds = sort_det > 1
+    pos_inds = sort_det > 2
     pos_weighted = np.where(pos_inds, sort_det, 0) # weight by number of agreeing videocoders
     tp = np.cumsum(pos_weighted)
     total_pos = pos_inds.sum() # number of considered score thresholds
@@ -67,7 +69,7 @@ def compute_average_precision_multiref(distances_list, score, threshold_dist):
     precision = tp / tot
     ap = np.sum(precision) / total_pos
 
-    return ap, precision[pos_inds], score[sort_inds][pos_inds], # AP, [precision_array], [score of true positives]
+    return ap, precision[pos_inds], score[sort_inds][pos_inds], tp[pos_inds], tot[pos_inds] # AP, [precision_array], [score of true positives]
 
 
 
@@ -122,19 +124,25 @@ def compute_average_recall_multiref(distance_array_list, score_array_list, dista
         TP_FN_count_tot = 0 # TP+FN
         for distance_array, score_array, N_vid_agree in zip(distance_array_list, score_array_list, N_vid_agree_list):
             # consider only annotations with at least 2 agreeing videocoders
-            distance_array = distance_array[N_vid_agree>1]
-            score_array = score_array[N_vid_agree>1]
-            
-            masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
-            distance_thresholded = np.where(masked_distance<dist_thr, 1, 0) # replace distances below dist thr by 1, other by 0
-            TP_count = distance_thresholded.sum(axis=1) # count of AI detection within detection threshold of each annotated degradation
-            TP_count_tot += (TP_count > 0).sum()
-            TP_FN_count_tot += len(TP_count)
+            if len(score_array) > 0:
+                distance_array = distance_array[N_vid_agree>2]
+                score_array = score_array[N_vid_agree>2]
+
+                masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
+                distance_thresholded = np.where(masked_distance<dist_thr, 1, 0) # replace distances below dist thr by 1, other by 0
+                TP_count = distance_thresholded.sum(axis=1) # count of AI detection within detection threshold of each annotated degradation
+                TP_count_tot += (TP_count > 0).sum()
+                TP_FN_count_tot += len(TP_count)
+                
             
         recall = TP_count_tot / TP_FN_count_tot # TP / (TP+FN)
         recall_list.append(recall)
 
-    ar = sum(recall_list) / len(recall_list)
+    try:
+        ar = sum(recall_list) / len(recall_list)
+    except:
+        ar = 0.
+        
     return ar, recall_list
 
 
@@ -384,19 +392,19 @@ def main(args):
             ar_dict = {}
             precision_recall_dict = {}
             for dthr in args.threshold_dist:
-                ap, precision_list, tp_scores = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], dthr)
+                print(class_name, dthr)
+                ap, precision_list, tp_scores, n_tp, n_tot = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], dthr)
                 ap_dict[f'{int(dthr)}m'] = ap
 
                 ar, recall_list = compute_average_recall_multiref(distances_array_videocoders_list[ic], AI_scores_array[ic], distances_videocoders, dthr, tp_scores)
                 ar_dict[f'{int(dthr)}m'] = ar
 
                 precision_recall_dict[f'{int(dthr)}m'] = {'ap':ap, 'ar':ar}
-                for p, r, s in zip(precision_list, recall_list, tp_scores):
-                    precision_recall_dict[f'{int(dthr)}m'][f'{s:.3f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r)}
+                for p, r, s, ntp, ntot in zip(precision_list, recall_list, tp_scores, n_tp, n_tot):
+                    precision_recall_dict[f'{int(dthr)}m'][f'{s:.5f}'] = {'precision':p, 'recall':r, 'f1_score':2*p*r/(p+r), 'n_tp':float(ntp), 'n_tot':float(ntot)}
 
             results[class_name] = precision_recall_dict
 
-        print(results.keys())
             
         with open(f'{outpath}/results.json', 'w') as fout:
             json.dump(results, fout, indent = 6)
@@ -432,7 +440,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--videocoders', nargs='*', type=str, default=['1', '2', '3', '4a', '4b'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['1', '2', '3', '4a', '4b', '5'], help='name of videocoders we compare AI to.')
     parser.add_argument('--process-every-nth-meter', type=float, default=3, help='step in meters between processed frames.')
     
     # args for AI

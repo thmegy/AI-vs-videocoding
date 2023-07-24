@@ -1,6 +1,6 @@
-[submodule "mmdetection"]
-	path = mmdetection
-	url = git@github.com:thmegy/mmdetection.git
 [submodule "MACE"]
 	path = MACE
 	url = git@github.com:dirkhovy/MACE.git
+[submodule "mmdet"]
+	path = mmdet
+	url = https://github.com/thmegy/mmdetection.git

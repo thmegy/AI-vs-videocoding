@@ -124,8 +124,8 @@ def parse_videocoding(jsonpath):
     for r in content["rubrics"]:
         if r["id"]==-9999:
             continue
-        if r['name'][-2] == ' ': # remove initial of videocoder if present
-            r['name'] = r['name'][:-2]
+        if len(r['name'].split(' ')[-1]) == 1 or len(r['name'].split(' ')[-1]) == 2 : # remove initial of videocoder if present (1 or 2 letters)
+            r['name'] = ' '.join(r['name'].split(' ')[:-1])
 
         classes[r["id"]] = r["name"]
             
