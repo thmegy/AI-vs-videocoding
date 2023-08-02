@@ -1,0 +1,22 @@
+{
+    // dict with pre-defined videos and their corresponding json
+    inputpath : 'data/reference_videos/'
+    json_dict_1 : { //Gaetan
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Gaetan/releve_lot_DEGRADATION_IA_20220516_091622_PC-GAETAN_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+    json_dict_2 : { //Leo
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Leo/releve_lot_IA_20220510_094310_MSI-LEO_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+    json_dict_3 : { //Nestor
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Nestor/releve_lot_IA_Comparaison2_20230508_115714_NESTOR-KOUAME_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+    json_dict_4a : { // Olivier
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Olivier/releve_lot_Comparaison_IA_20220608_112100_PC-STOCCO_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+    json_dict_4b : { //Olivier v2
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230424_151510_PC-STOCCO_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+    json_dict_5 : { //Jean-Marc v2
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230522_162332_JEAN-MARC_AV_no_contract_CD_33_20210309_101639_889.json',
+    }
+}

@@ -92,4 +92,20 @@
 	'Vannes_logiroad_2_20220124_094528_789.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230426_173112_PC-STOCCO_AV_Vannes_logiroad_2_20220124_094528_789.json',
 	'Vannes_logiroad_2_20220124_165314_007.mp4' : 'videocoding/Olivier_2/releve_lot_Olivier_S_IA_20230426_181734_PC-STOCCO_AV_Vannes_logiroad_2_20220124_165314_007.json',
     }
+    json_dict_5 : { //Jean-Marc v2
+	'CC_BHS_logiroad_2_20210531_161706_390.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230512_103622_JEAN-MARC_AV_CC_BHS_logiroad_2_20210531_161706_390.json',
+	'CC_BHS_logiroad_2_20210601_080253_408.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230512_123323_JEAN-MARC_AV_CC_BHS_logiroad_2_20210601_080253_408.json',
+	'CC_BHS_logiroad_2_20210707_140609_300.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230516_110041_JEAN-MARC_AV_CC_BHS_logiroad_2_20210707_140609_300.json',
+	'CD27_EURE_EURE_1_20220112_114308_180.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230516_134943_JEAN-MARC_AV_CD27_EURE_EURE_1_20220112_114308_180.json',
+	'CD27_EURE_EURE_1_20220209_140240_074.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230516_140624_JEAN-MARC_AV_CD27_EURE_EURE_1_20220209_140240_074.json',
+	'CD27_EURE_EURE_1_20220323_082403_092.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230516_145905_JEAN-MARC_AV_CD27_EURE_EURE_1_20220323_082403_092.json',
+	'Douarnenez_AV_Logiroad_AV_20220315_120749_017.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230519_133821_JEAN-MARC_AV_Douarnenez_AV_Logiroad_AV_20220315_120749_017.json',
+	'Douarnenez_AV_Logiroad_AV_20220317_085336_460.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230522_095650_JEAN-MARC_AV_Douarnenez_AV_Logiroad_AV_20220317_085336_460.json',
+	'Douarnenez_AV_Logiroad_AV_20220317_172419_603.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230522_104430_JEAN-MARC_AV_Douarnenez_AV_Logiroad_AV_20220317_172419_603.json',
+	'no_contract_CD 33_20210309_101639_889.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230522_162332_JEAN-MARC_AV_no_contract_CD_33_20210309_101639_889.json',
+	'no_contract_CD 33_20210311_111829_045.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230523_120719_JEAN-MARC_AV_no_contract_CD_33_20210311_111829_045.json',
+	'no_contract_CD 33_20210420_164326_010.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230523_131130_JEAN-MARC_AV_no_contract_CD_33_20210420_164326_010.json',
+	'Vannes_logiroad_2_20220124_094528_789.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230523_143450_JEAN-MARC_AV_Vannes_logiroad_2_20220124_094528_789.json',
+	'Vannes_logiroad_2_20220124_165314_007.mp4' : 'videocoding/Jean_marc_2/releve_lot_PROJET_IA_COMPARAISON_20230523_162607_JEAN-MARC_AV_Vannes_logiroad_2_20220124_165314_007.json',
+    }
 }

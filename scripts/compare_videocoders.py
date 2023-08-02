@@ -12,6 +12,7 @@ mpl.use('Agg')
 import matplotlib.pyplot as plt
 import krippendorff
 import subprocess
+import glob, shutil
 
 from utils import extract_lengths_videocoding, compute_smallest_distances
 
@@ -261,67 +262,68 @@ def main(args):
             comb = {videocoder, videocoder_other}
             if comb not in combinations:
                 combinations.append(comb)
-                
-    # loop over videocoders combinations
-    for comb in combinations:
-        videocoder_1, videocoder_2 = sorted(list(comb))
-        length_video_list_1, length_video_list_2 = length_video_dict[videocoder_1], length_video_dict[videocoder_2]
-        print(f'\nRunning comparison for {videocoder_1}_vs_{videocoder_2}')
-#        print(f'{"class" : <30}{"F1_score": ^10}')
-        outpath = f'{outpath_base}/{videocoder_1}_vs_{videocoder_2}'
-        os.makedirs(outpath, exist_ok=True)
-    
-        results = {'recall':{}, 'precision':{}, 'f1_score':{}}
-                   
-        # compute distances for all classes          
-        # loop over classes
-        for ic in range(len(classes_comp)):
-            class_name = list(classes_comp.keys())[ic]
-            results['recall'][class_name] = {}
-            results['precision'][class_name] = {}
-            results['f1_score'][class_name] = {}
 
-            distances_video_list_1 = []
-            distances_video_list_2 = []
+    if not args.skip_binary_comparison:
+        # loop over videocoders combinations
+        for comb in combinations:
+            videocoder_1, videocoder_2 = sorted(list(comb))
+            length_video_list_1, length_video_list_2 = length_video_dict[videocoder_1], length_video_dict[videocoder_2]
+            print(f'\nRunning comparison for {videocoder_1}_vs_{videocoder_2}')
+    #        print(f'{"class" : <30}{"F1_score": ^10}')
+            outpath = f'{outpath_base}/{videocoder_1}_vs_{videocoder_2}'
+            os.makedirs(outpath, exist_ok=True)
 
-            # loop over videos
-            for length_video_1, length_video_2 in zip(length_video_list_1, length_video_list_2):
-                lv1 = length_video_1[ic]
-                lv2 = length_video_2[ic]
+            results = {'recall':{}, 'precision':{}, 'f1_score':{}}
 
-                distances_video_list_1.append( compute_smallest_distances(lv1, lv2) )
-                distances_video_list_2.append( compute_smallest_distances(lv2, lv1) )
+            # compute distances for all classes          
+            # loop over classes
+            for ic in range(len(classes_comp)):
+                class_name = list(classes_comp.keys())[ic]
+                results['recall'][class_name] = {}
+                results['precision'][class_name] = {}
+                results['f1_score'][class_name] = {}
 
-            distances_video_1 = np.concatenate(distances_video_list_1)
-            distances_video_2 = np.concatenate(distances_video_list_2)
+                distances_video_list_1 = []
+                distances_video_list_2 = []
 
-            # plot distance distributions
-            plot_distance_distributions(distances_video_1, distances_video_2, outpath, class_name)
+                # loop over videos
+                for length_video_1, length_video_2 in zip(length_video_list_1, length_video_list_2):
+                    lv1 = length_video_1[ic]
+                    lv2 = length_video_2[ic]
 
-            # compute precision and recall
-            # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches with several predictions.
-            recall_dict = {}
-            precision_dict = {}
-            f1_dict = {}
-            for dthr in args.threshold:
-                precision, recall = compute_precision_recall(distances_video_2, distances_video_1, dthr)
-                recall_dict[f'{int(dthr)}m'] = recall
-                precision_dict[f'{int(dthr)}m'] = precision
-                f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
+                    distances_video_list_1.append( compute_smallest_distances(lv1, lv2) )
+                    distances_video_list_2.append( compute_smallest_distances(lv2, lv1) )
 
-            results['recall'][class_name] = recall_dict
-            results['precision'][class_name] = precision_dict
-            results['f1_score'][class_name] = f1_dict
+                distances_video_1 = np.concatenate(distances_video_list_1)
+                distances_video_2 = np.concatenate(distances_video_list_2)
 
-            distance_thr = '10m' # threshold used to extract single summary figures
-#            print(f'{class_name : <30} {results["f1_score"][class_name][distance_thr]:^10.3f}')
+                # plot distance distributions
+                plot_distance_distributions(distances_video_1, distances_video_2, outpath, class_name)
 
-            plot_evolution(results, 'precision', 'Precision', outpath)
-            plot_evolution(results, 'recall', 'Recall', outpath)
-            plot_precision_recall(results, outpath)
+                # compute precision and recall
+                # number of true positives is different when taken from distances from videocoding or from AI prediction, e.g. one videocoding matches with several predictions.
+                recall_dict = {}
+                precision_dict = {}
+                f1_dict = {}
+                for dthr in args.threshold:
+                    precision, recall = compute_precision_recall(distances_video_2, distances_video_1, dthr)
+                    recall_dict[f'{int(dthr)}m'] = recall
+                    precision_dict[f'{int(dthr)}m'] = precision
+                    f1_dict[f'{int(dthr)}m'] = 2*precision*recall / (precision+recall)
 
-            with open(f'{outpath}/results.json', 'w') as fout:
-                json.dump(results, fout, indent = 6)
+                results['recall'][class_name] = recall_dict
+                results['precision'][class_name] = precision_dict
+                results['f1_score'][class_name] = f1_dict
+
+                distance_thr = '10m' # threshold used to extract single summary figures
+    #            print(f'{class_name : <30} {results["f1_score"][class_name][distance_thr]:^10.3f}')
+
+                plot_evolution(results, 'precision', 'Precision', outpath)
+                plot_evolution(results, 'recall', 'Recall', outpath)
+                plot_precision_recall(results, outpath)
+
+                with open(f'{outpath}/results.json', 'w') as fout:
+                    json.dump(results, fout, indent = 6)
 
 
                 
@@ -360,52 +362,76 @@ def main(args):
             #plot_timeline(presence_array, args.videocoders, class_name, f'results_comparison/videocoders/{video.replace(".mp4", "")}_{class_name}_timeline.png')
             presence_array_list.append(presence_array)
 
+            # Extract images in areas where at least one videocoder has seen a NdP
+            if ic==2:
+                video_name = video.replace(".mp4", "")
+                os.makedirs(f'extracted_ndp_videocoders/{video_name}', exist_ok=True)
+                print(class_name)
+                img_path = f'prepare_annotations/processed_videos/{video_name}/3/'
+                imgs = glob.glob(f'{img_path}/*.jpg')
+                imgs = [float(i.split('/')[-1].replace('.jpg','')) for i in imgs]
+                
+                presence_sum = presence_array.sum(axis=0)
+                ndp = np.where(presence_sum>0)[0]
+
+                for i in imgs:
+                    idx = np.where(np.abs(ndp-i)<1.5)[0]
+                    if len(idx) > 0:
+                        n_agree = int(presence_sum[ndp[idx]].max())
+                        shutil.copy(f'{img_path}/{i}.jpg', f'extracted_ndp_videocoders/{video_name}/{i}_{n_agree}.jpg')
+                
         plot_timeline_grouped(presence_array_list, args.videocoders, class_name, video_list, f'{outpath_base}/{class_name}_timeline.png')
 
-        # evaluate annotator competence with MACE and inter-annotator agreement with krippendorff's alpha
-        presence_array_tot = np.concatenate(presence_array_list, axis=1)
-        k_alpha = krippendorff.alpha(reliability_data=presence_array_tot.astype("str"), level_of_measurement="nominal")
-        k_alpha_list.append(k_alpha)
-        print(f'{class_name : <30} {k_alpha:^10.3f}')
+        if not args.skip_MACE:
+            # evaluate annotator competence with MACE and inter-annotator agreement with krippendorff's alpha
+            presence_array_tot = np.concatenate(presence_array_list, axis=1)
+            k_alpha = krippendorff.alpha(reliability_data=presence_array_tot.astype("str"), level_of_measurement="nominal")
+            k_alpha_list.append(k_alpha)
+            print(f'{class_name : <30} {k_alpha:^10.3f}')
 
-        np.savetxt(f'{outpath_base}/MACE_inputs/{class_name}.csv', presence_array_tot.T, fmt='%i', delimiter=',')
-        with open(f'{outpath_base}/MACE_inputs/{class_name}_count.tsv', 'w') as fprior: # save counts of 0s and 1s to be used as priors in MACE
-            idx, count = np.unique(presence_array_tot, return_counts=True)
-            for i, c in zip(idx, count):
-                fprior.write(f'{int(i)}\t{c}\n')
-        subprocess.run(
-            f'./MACE/MACE --prefix MACE/results/{class_name} --priors {outpath_base}/MACE_inputs/{class_name}_count.tsv {outpath_base}/MACE_inputs/{class_name}.csv',
-#            f'./MACE/MACE --prefix MACE/results/{class_name} {outpath_base}/MACE_inputs/{class_name}.csv',
-            shell=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
-        mace_competence_array.append(np.loadtxt(f'MACE/results/{class_name}.competence'))
+            np.savetxt(f'{outpath_base}/MACE_inputs/{class_name}.csv', presence_array_tot.T, fmt='%i', delimiter=',')
+            with open(f'{outpath_base}/MACE_inputs/{class_name}_count.tsv', 'w') as fprior: # save counts of 0s and 1s to be used as priors in MACE
+                idx, count = np.unique(presence_array_tot, return_counts=True)
+                for i, c in zip(idx, count):
+                    fprior.write(f'{int(i)}\t{c}\n')
+            subprocess.run(
+                f'./MACE/MACE --prefix MACE/results/{class_name} --priors {outpath_base}/MACE_inputs/{class_name}_count.tsv {outpath_base}/MACE_inputs/{class_name}.csv',
+    #            f'./MACE/MACE --prefix MACE/results/{class_name} {outpath_base}/MACE_inputs/{class_name}.csv',
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            mace_competence_array.append(np.loadtxt(f'MACE/results/{class_name}.competence'))
 
-    # print competence of videocoders for each class
-    mace_competence_array = np.stack(mace_competence_array).T
-    cls_str = ' '.join([f' {c[:15]:^15}' for c in classes_comp.keys()])
-    print(f'{"videocoder" : <10} {cls_str} {"Average Competence":^15}')
-    for videocoder, comp in zip(args.videocoders, mace_competence_array):
-        comp_str = ' '.join([f' {c:^15.2f}' for c in comp])
-        print(f'{videocoder : <10} {comp_str} {comp.mean():^15.2f}')
+    if not args.skip_MACE:
+        # print competence of videocoders for each class
+        mace_competence_array = np.stack(mace_competence_array).T
+        cls_str = ' '.join([f' {c[:15]:^15}' for c in classes_comp.keys()])
+        print(f'{"videocoder" : <10} {cls_str} {"Average Competence":^15}')
+        for videocoder, comp in zip(args.videocoders, mace_competence_array):
+            comp_str = ' '.join([f' {c:^15.2f}' for c in comp])
+            print(f'{videocoder : <10} {comp_str} {comp.mean():^15.2f}')
 
-    np.savetxt(f'{outpath_base}/MACE_competence.txt', mace_competence_array, header=f'rows: {", ".join(classes_comp.keys())}\n columns: {", ".join(args.videocoders)}', fmt='%.3f')
-    np.savetxt(f'{outpath_base}/k_alpha.txt', k_alpha_list, header=f'rows: {", ".join(classes_comp.keys())}', fmt='%.3f')
+        np.savetxt(f'{outpath_base}/MACE_competence.txt', mace_competence_array, header=f'rows: {", ".join(classes_comp.keys())}\n columns: {", ".join(args.videocoders)}', fmt='%.3f')
+        np.savetxt(f'{outpath_base}/k_alpha.txt', k_alpha_list, header=f'rows: {", ".join(classes_comp.keys())}', fmt='%.3f')
 
-    plot_competence(mace_competence_array, args.videocoders, classes_comp.keys(), f'{outpath_base}/MACE_competence.png')
+        plot_competence(mace_competence_array, args.videocoders, classes_comp.keys(), f'{outpath_base}/MACE_competence.png')
 
     
             
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--videocoders', nargs='*', type=str, default=['1','2','3','4a','4b'], help='name of videocoders we compare AI to.')
+    parser.add_argument('--videocoders', nargs='*', type=str, default=['1','2','3','4a','4b', '5'], help='name of videocoders we compare AI to.')
     parser.add_argument('--videocoding-config', default='configs/videocoding_reference_videos.json', help='json file with dicts to videocoding files corresponding to predefined videos.')
     parser.add_argument('--cls-config', default='configs/classes_reference_videos.json', help='json file with dicts to link classes from AI and videocoding.')
     
     parser.add_argument('--process-every-nth-meter', type=float, default=1, help='step in meters between processed frames.')
     parser.add_argument("--threshold", type=float, nargs='*', default=[2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
                         help='distance (in meter) between a prediction and a videocoding below which we consider a match as a True Positive.')
+
+    parser.add_argument('--skip-binary-comparison', action='store_true')
+    parser.add_argument('--skip-MACE', action='store_true')
+
     args = parser.parse_args()
 
     main(args)
