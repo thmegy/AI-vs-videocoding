@@ -415,16 +415,23 @@ def extract_lengths_AI(videopath, geoptis_csvpath, classes_AI, classes_comp, ai_
                     continue
                 image_width = frame.shape[1]
                 image_height = frame.shape[0]
-                for ic, c in enumerate(res): # loop on classes
-                    if (c[:,4] > 0.01).sum() > 0:
+                
+                bboxes = res.pred_instances.numpy()['bboxes']
+                scores = res.pred_instances.numpy()['scores']
+                labels = res.pred_instances.numpy()['labels']
 
-                        degradation_name = list(classes_AI.items())[ic][1]
+                for label in np.unique(labels):
+                    if (scores[labels==label] > 0.01).sum() > 0:
+                        degradation_name = list(classes_AI.items())[label][1]
+                    
                         if degradation_name != '':
                             idx = classes_comp[degradation_name]
 
                             length_AI[idx].append(d)
-                            length_AI_score[idx].append(c[:,4].max().item()) # take highest score if several instances of same class
+                            length_AI_score[idx].append(scores[labels==label].max().item()) # take highest score if several instances of same class
 
+
+                    
         outdict = {}
         outdict['length'] = length_AI
         outdict['score'] = length_AI_score

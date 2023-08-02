@@ -392,7 +392,6 @@ def main(args):
             ar_dict = {}
             precision_recall_dict = {}
             for dthr in args.threshold_dist:
-                print(class_name, dthr)
                 ap, precision_list, tp_scores, n_tp, n_tot = compute_average_precision_multiref(np.stack(distances_AI_videocoders_list[ic]), AI_scores[ic], dthr)
                 ap_dict[f'{int(dthr)}m'] = ap
 
