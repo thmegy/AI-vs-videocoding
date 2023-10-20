@@ -32,38 +32,69 @@ def read_json(path):
 
 
 def plot_class_matrices(matrix, metric_name, videocoders, class_names):
-    fig, ax = plt.subplots(2,4, figsize=(28,9), sharex='col', sharey='row')
-    ax = ax.flatten()
+    print(f'\nPlotting {metric_name}...')
+    fig = plt.figure(figsize=(30,9))
+    subfigs_cbar = fig.subfigures(nrows=1, ncols=2, width_ratios=(10,1))
+    subfigs = subfigs_cbar[0].subfigures(nrows=2, ncols=4)
+    subfigs = subfigs.flatten()
 
     for ic, cls in enumerate(class_names):
         opts = {'cmap': 'RdYlGn', 'vmin': 0, 'vmax': +1}
-
-        heatmap = ax[ic].pcolor(matrix[:,:,ic], **opts)
+        
+        ax = subfigs[ic].subplots(2, 2, sharex='col', sharey='row', gridspec_kw={'width_ratios':(4, 1), 'wspace':0.05, 'height_ratios':(1, 4), 'hspace':0.05})
+        
+        heatmap = ax[1,0].pcolor(matrix[:,:,ic], **opts)
         for irow in range(matrix[:,:,ic].shape[0]):
             for icol in range(matrix[:,:,ic].shape[1]):
-                ax[ic].text(icol+0.5, irow+0.5, '{:.3f}'.format(matrix[:,:,ic][irow][icol]),
+                ax[1,0].text(icol+0.5, irow+0.5, '{:.3f}'.format(matrix[:,:,ic][irow][icol]),
                         ha="center", va="center", color="black")
 
-        ax[ic].set_yticks(np.arange(0.5, matrix.shape[0], 1))
-        ax[ic].set_yticklabels(videocoders)
-        ax[ic].set_xticks(np.arange(0.5, matrix.shape[0], 1))
-        ax[ic].set_xticklabels(videocoders, rotation=45, ha='right')
-        ax[ic].set_title(cls)
+        ax[1,0].set_yticks(np.arange(0.5, matrix.shape[0], 1))
+        ax[1,0].set_yticklabels(videocoders)
+        ax[1,0].set_xticks(np.arange(0.5, matrix.shape[0], 1))
+        ax[1,0].set_xticklabels(videocoders, rotation=45, ha='right')
         
         if ic%4 == 0:
-            ax[ic].set_ylabel('Compared')
+            ax[1,0].set_ylabel('Compared')
         if ic >= 4:
-            ax[ic].set_xlabel('Reference')
+            ax[1,0].set_xlabel('Reference')
 
+        avg_line = ( (matrix[:,:,ic].sum(axis=1)-1) / (matrix[:,:,ic].shape[1]-1) ).reshape(-1,1)
+        ax[1,1].pcolor(avg_line, **opts)
+        for irow in range(avg_line.shape[0]):
+            for icol in range(avg_line.shape[1]):
+                ax[1,1].text(icol+0.5, irow+0.5, '{:.3f}'.format(avg_line[irow][icol]),
+                        ha="center", va="center", color="black")
+
+        ax[1,1].set_xticks([0.5])
+        ax[1,1].set_xticklabels(['mean'], rotation=45, ha='right')
+
+        avg_col = ( (matrix[:,:,ic].sum(axis=0)-1) / (matrix[:,:,ic].shape[0]-1) ).reshape(1,-1)
+        ax[0,0].pcolor(avg_col, **opts)
+        for irow in range(avg_col.shape[0]):
+            for icol in range(avg_col.shape[1]):
+                ax[0,0].text(icol+0.5, irow+0.5, '{:.3f}'.format(avg_col[irow][icol]),
+                        ha="center", va="center", color="black")
+
+        ax[0,0].set_yticks([0.5])
+        ax[0,0].set_yticklabels(['mean'], rotation=45, ha='right') 
+        ax[0,0].set_title(cls)
+
+        ax[0,1].axis('off')
+       
 #        np.savetxt(f'/home/thmegy/Téléchargements/{metric_name}_{cls}.txt', matrix[:,:,ic],
 #                   delimiter=',', header=','.join(videocoders))
     
-    cbar = fig.colorbar(heatmap, ax=ax.ravel().tolist())
+
+    ax = subfigs_cbar[1].subplots()
+    ax.axis('off')
+    cax = subfigs_cbar[1].add_axes([0.4, 0.2, 0.2, 0.7])
+    cbar = subfigs_cbar[1].colorbar(heatmap, cax=cax)
     cbar.set_label(metric_name)
     fig.patch.set_facecolor('white')
     fig.savefig(f'plots/{metric_name}_matrix.png')
+
     
-        
     
 def main(args):
     distance_thr = f'{args.distance_thr}m'
