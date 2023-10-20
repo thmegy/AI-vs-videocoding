@@ -48,14 +48,15 @@ def compute_average_precision_multiref(distances_list, score, threshold_dist):
     '''
     # get number of videocoders agreeing with each IA detection
     N_vid_agree = (distances_list < threshold_dist).sum(axis=0)
-    
+    consensus_threshold = int(distances_list.shape[0] / 2 - 1)
+
     # sort examples
     sort_inds = np.argsort(-score)
     sort_det = N_vid_agree[sort_inds]
 
     sorted_score = score[sort_inds]
     # count true positive examples
-    pos_inds = sort_det > 2
+    pos_inds = sort_det > consensus_threshold
     pos_weighted = np.where(pos_inds, sort_det, 0) # weight by number of agreeing videocoders
     tp = np.cumsum(pos_weighted)
     total_pos = pos_inds.sum() # number of considered score thresholds
@@ -115,6 +116,7 @@ def compute_average_recall_multiref(distance_array_list, score_array_list, dista
     for dist in distances_videocoders:
         N_vid_agree = (dist < dist_thr).sum(axis=0)
         N_vid_agree_list.append(N_vid_agree+1)
+    consensus_threshold = int(len(distance_array_list) / 2 - 1)
 
     # loop in score thresholds, at each iteration compute number of FN
     recall_list = []
@@ -125,8 +127,8 @@ def compute_average_recall_multiref(distance_array_list, score_array_list, dista
         for distance_array, score_array, N_vid_agree in zip(distance_array_list, score_array_list, N_vid_agree_list):
             # consider only annotations with at least 2 agreeing videocoders
             if len(score_array) > 0:
-                distance_array = distance_array[N_vid_agree>2]
-                score_array = score_array[N_vid_agree>2]
+                distance_array = distance_array[N_vid_agree>consensus_threshold]
+                score_array = score_array[N_vid_agree>consensus_threshold]
 
                 masked_distance = np.where(score_array > score_thr, distance_array, 50) # set distances corresponding to scores below score threshold to 50m --> above dist threshold
                 distance_thresholded = np.where(masked_distance<dist_thr, 1, 0) # replace distances below dist thr by 1, other by 0
